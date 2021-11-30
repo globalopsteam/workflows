@@ -3,10 +3,6 @@ name: Build docker image, push to AWS ECR, and deploy code
 on:
   workflow_call:
     inputs:
-      ENV:
-        default: 'dev'
-        required: false
-        type: string
       ECR_REPOSITORY:
         required: true
         type: string
@@ -22,6 +18,7 @@ on:
         default: 't3a.micro'
         required: false
         type: string
+
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
@@ -30,33 +27,16 @@ on:
       GH_PERSONAL_ACCESS_TOKEN:
         required: true
 
-      PROD_AWS_REGION:
+      AWS_REGION:
         required: true
-      DEV_AWS_REGION:
+      EC2_IMAGE:
         required: true
-      PROD_EC2_IMAGE:
+      EC2_SUBNET:
         required: true
-      DEV_EC2_IMAGE:
+      EC2_SECURITY_GROUP:
         required: true
-      PROD_EC2_SUBNET:
+      EC2_IAM_ROLE:
         required: true
-      DEV_EC2_SUBNET:
-        required: true
-      PROD_EC2_SECURITY_GROUP:
-        required: true
-      DEV_EC2_SECURITY_GROUP:
-        required: true
-      PROD_EC2_IAM_ROLE:
-        required: true
-      DEV_EC2_IAM_ROLE:
-        required: true      
-
-env:
-  AWS_REGION: ${{ (inputs.ENV == 'prod' || inputs.ENV == 'production') && secrets.PROD_AWS_REGION || secrets.DEV_AWS_REGION }}
-  EC2_IMAGE: ${{ (inputs.ENV == 'prod' || inputs.ENV == 'production') && secrets.PROD_EC2_IMAGE || secrets.DEV_EC2_IMAGE }}
-  EC2_SUBNET: ${{ (inputs.ENV == 'prod' || inputs.ENV == 'production') && secrets.PROD_EC2_SUBNET || secrets.DEV_EC2_SUBNET }}
-  EC2_SECURITY_GROUP: ${{ (inputs.ENV == 'prod' || inputs.ENV == 'production') && secrets.PROD_EC2_SECURITY_GROUP || secrets.DEV_EC2_SECURITY_GROUP }}
-  EC2_IAM_ROLE: ${{ (inputs.ENV == 'prod' || inputs.ENV == 'production') && secrets.PROD_EC2_IAM_ROLE || secrets.DEV_EC2_IAM_ROLE }}
 
 jobs:
   start-runner:
@@ -71,23 +51,22 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
       - name: Start EC2 runner
         id: start-ec2-runner
         uses: machulav/ec2-github-runner@v2
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id: ${{ env.EC2_IMAGE }}
-          ec2-instance-type: ${{ inputs.EC2_INSTANCE_TYPE }}
-          subnet-id: ${{ env.EC2_SUBNET }}
-          security-group-id: ${{ env.EC2_SECURITY_GROU }}
-          iam-role-name: ${{ env.EC2_IAM_ROLE }}
+          ec2-image-id: ${{ secrets.EC2_IMAGE }}
+          ec2-instance-type: ${{ secrets.EC2_INSTANCE_TYPE }}
+          subnet-id: ${{ secrets.EC2_SUBNET }}
+          security-group-id: ${{ secrets.EC2_SECURITY_GROUP }}
+          iam-role-name: ${{ secrets.EC2_IAM_ROLE }}
   push:
     name: Deploy
     needs: start-runner
     runs-on: ${{ needs.start-runner.outputs.label }}
-    environment: production
 
     steps:
     - name: Checkout
@@ -126,7 +105,7 @@ jobs:
       if: inputs.DEPLOY_EC2_INSTANCE != ''
       id: get-ec2-ip
       run: |
-        echo "::set-output name=ec2_ip::$(aws ec2 describe-instances --query "Reservations[*].Instances[*].PrivateIpAddress" --filter "Name=tag:Name,Values=${{ inputs.DEPLOY_EC2_INSTANCE }}" --region "${{ env.AWS_REGION }}" --output=text)"
+        echo "::set-output name=ec2_ip::$(aws ec2 describe-instances --query "Reservations[*].Instances[*].PrivateIpAddress" --filter "Name=tag:Name,Values=${{ inputs.DEPLOY_EC2_INSTANCE }}" --region "${{ secrets.AWS_REGION }}" --output=text)"
     - name: Deploy code to EC2 instance
       if: inputs.DEPLOY_EC2_INSTANCE != '' && steps.get-ec2-ip.outputs.ec2_ip != ''
       env:
@@ -139,7 +118,7 @@ jobs:
         echo "Creating environment file for docker-compose" >&2
         echo "DOCKERHOME=/home/ubuntu" > ".env"
         echo "ECR_REGISTRY=${ECR_REGISTRY}" >> ".env"
-        echo "AWS_REGION=${{ env.AWS_REGION }}" >> ".env"
+        echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> ".env"
 
         echo "Deploying Code" >&2
         tar -c ".env" "docker-compose.yml" ${{ inputs.DEPLOY_TAR_FILES_EXTRA }} | ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "ubuntu@${SSH_HOST}" "${{ inputs.ECR_REPOSITORY }}"
@@ -156,7 +135,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
       - name: Stop EC2 runner
         uses: machulav/ec2-github-runner@v2
         with:
