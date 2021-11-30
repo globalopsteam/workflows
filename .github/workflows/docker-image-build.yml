@@ -57,9 +57,9 @@ jobs:
         uses: machulav/ec2-github-runner@v2
         with:
           mode: start
-          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           ec2-image-id: ${{ secrets.EC2_IMAGE }}
-          ec2-instance-type: ${{ secrets.EC2_INSTANCE_TYPE }}
+          ec2-instance-type: ${{ env.EC2_INSTANCE_TYPE }}
           subnet-id: ${{ secrets.EC2_SUBNET }}
           security-group-id: ${{ secrets.EC2_SECURITY_GROUP }}
           iam-role-name: ${{ secrets.EC2_IAM_ROLE }}
@@ -140,6 +140,6 @@ jobs:
         uses: machulav/ec2-github-runner@v2
         with:
           mode: stop
-          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           label: ${{ needs.start-runner.outputs.label }}
           ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
