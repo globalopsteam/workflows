@@ -24,7 +24,7 @@ on:
         required: true
       AWS_SECRET_ACCESS_KEY:
         required: true
-      GH_PERSONAL_ACCESS_TOKEN:
+      GITHUB_TOKEN:
         required: true
 
       AWS_REGION:
