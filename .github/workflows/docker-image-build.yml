@@ -57,7 +57,7 @@ jobs:
         uses: machulav/ec2-github-runner@v2
         with:
           mode: start
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ github.token }}
           ec2-image-id: ${{ secrets.EC2_IMAGE }}
           ec2-instance-type: ${{ inputs.EC2_INSTANCE_TYPE }}
           subnet-id: ${{ secrets.EC2_SUBNET }}
