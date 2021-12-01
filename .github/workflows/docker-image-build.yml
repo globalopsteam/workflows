@@ -68,6 +68,8 @@ jobs:
     name: Build+Push Image
     needs: start-runner
     runs-on: ${{ needs.start-runner.outputs.label }}
+    outputs:
+      ecr-registry: ${{ steps.login-ecr.outputs.registry }}
     steps:
     - name: Checkout
       uses: actions/checkout@v2
@@ -122,7 +124,7 @@ jobs:
     - name: Deploy code to EC2 instance
       if: inputs.DEPLOY_EC2_INSTANCE != '' && steps.get-ec2-ip.outputs.ec2_ip != ''
       env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REGISTRY: ${{ needs.build-push.outputs.ecr-registry }}
         SSH_HOST: ${{ steps.get-ec2-ip.outputs.ec2_ip }}
       run: |
         echo "Testing SSH connection" >&2
