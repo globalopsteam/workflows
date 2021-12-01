@@ -24,7 +24,7 @@ on:
         required: true
       AWS_SECRET_ACCESS_KEY:
         required: true
-      GITHUB_TOKEN:
+      GH_RUNNER_TOKEN:
         required: true
 
       AWS_REGION:
@@ -57,7 +57,7 @@ jobs:
         uses: machulav/ec2-github-runner@v2
         with:
           mode: start
-          github-token: ${{ github.token }}
+          github-token: ${{ secrets.GH_RUNNER_TOKEN }}
           ec2-image-id: ${{ secrets.EC2_IMAGE }}
           ec2-instance-type: ${{ inputs.EC2_INSTANCE_TYPE }}
           subnet-id: ${{ secrets.EC2_SUBNET }}
