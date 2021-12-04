@@ -118,7 +118,7 @@ jobs:
         IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
         IMAGE_FULL_LATEST: ${{ steps.check-ecr.outputs.latest }}
         ENV: ${{ inputs.ENV }}
-        DEPLOYMENT_S3: "s3://globalops-deployment-metadata/${{ ${{ inputs.ENV }}}}/${{ inputs.ECR_REPOSITORY }}.json"
+        DEPLOYMENT_S3: "s3://globalops-deployment-metadata/${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.json"
       run: |
         echo "Creating environment file for docker-compose" >&2
         echo "IMAGE_FULL_TAG=${IMAGE_FULL_TAG}" >> ".env"
