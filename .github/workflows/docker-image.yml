@@ -118,23 +118,26 @@ jobs:
         IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
         IMAGE_FULL_LATEST: ${{ steps.check-ecr.outputs.latest }}
         ENV: ${{ inputs.ENV }}
-        ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
+        DEPLOYMENT_S3: "s3://globalops-deployment-metadata/${{ ${{ inputs.ENV }}}}/${{ inputs.ECR_REPOSITORY }}.json"
       run: |
         echo "Creating environment file for docker-compose" >&2
         echo "IMAGE_FULL_TAG=${IMAGE_FULL_TAG}" >> ".env"
         echo "IMAGE_FULL_LATEST=${IMAGE_FULL_LATEST}" >> ".env"
         echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> ".env"
+        echo "ENV=${ENV}" >> ".env"
 
         echo "Creating archive for deployment" >&2
         tar -c ".env" "docker-compose.yml" ${{ inputs.DEPLOY_TAR_FILES_EXTRA }} | gzip -9 > ".archive.tgz"
 
-        echo "Preparing deployment.json"
+        echo "Preparing deployment JSON"
         echo -n '{"archive":"' > ".deployment.json"
         base64 -w 0 >> ".deployment.json" < ".archive.tgz"
         echo '"}' >> ".deployment.json"
 
-        echo "Updating deployment.json in S3" >&2
-        aws s3 cp ".deployment.json" "s3://globalops-deployment-metadata/${ENV}/${ECR_REPOSITORY}.json"
+        echo "Updating deployment JSON: ${DEPLOYMENT_S3}" >&2
+        aws s3 cp ".deployment.json" "${DEPLOYMENT_S3}" || true # ignore failure for now
+        echo "Deployment metadata: $(cat .deployment.json)" # temp until we get s3 working
+
 
   deploy:
     name: Deploy
