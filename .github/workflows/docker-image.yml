@@ -121,10 +121,11 @@ jobs:
         DEPLOYMENT_S3: "s3://globalops-deployment-metadata/${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.json"
       run: |
         echo "Creating environment file for docker-compose" >&2
+        echo "AWS_REGION=${{ secrets.AWS_REGION }}" > ".env"
+        echo "DOCKERHOME=/home/ubuntu" >> ".env"
+        echo "ENV=${ENV}" >> ".env"
         echo "IMAGE_FULL_TAG=${IMAGE_FULL_TAG}" >> ".env"
         echo "IMAGE_FULL_LATEST=${IMAGE_FULL_LATEST}" >> ".env"
-        echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> ".env"
-        echo "ENV=${ENV}" >> ".env"
 
         echo "Creating archive for deployment" >&2
         tar -c ".env" "docker-compose.yml" ${{ inputs.DEPLOY_TAR_FILES_EXTRA }} | gzip -9 > ".archive.tgz"
