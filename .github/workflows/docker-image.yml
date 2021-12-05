@@ -114,6 +114,7 @@ jobs:
         echo "::set-output name=image::$IMAGE_FULL_TAG"
 
     - name: Prepare for deployment
+      if: inputs.DEPLOY_EC2_INSTANCE != ''
       env:
         IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
         IMAGE_FULL_LATEST: ${{ steps.check-ecr.outputs.latest }}
