@@ -68,6 +68,7 @@ jobs:
           subnet-id: ${{ secrets.EC2_SUBNET }}
           security-group-id: ${{ secrets.EC2_SECURITY_GROUP }}
           iam-role-name: ${{ secrets.EC2_IAM_ROLE }}
+          aws-resource-tags: '{"service":"github-runner", "name":"runner-${{ github.sha }}"}'
 
   build-push:
     name: Build + Push
