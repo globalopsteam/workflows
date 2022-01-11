@@ -158,6 +158,7 @@ jobs:
 
   deploy:
     name: Deploy
+    if: always() && inputs.DEPLOY_EC2_INSTANCE != ''
     needs:
       - start-runner
       - build-push
@@ -165,12 +166,11 @@ jobs:
     steps:
     - name: Get EC2 instance IP address
       id: get-ec2-ip
-      if: inputs.DEPLOY_EC2_INSTANCE != ''
       run: |
         echo "::set-output name=ec2_ip::$(aws ec2 describe-instances --query "Reservations[*].Instances[*].PrivateIpAddress" --filter "Name=tag:Name,Values=${{ inputs.DEPLOY_EC2_INSTANCE }}" --region "${{ secrets.AWS_REGION }}" --output=text)"
 
     - name: Deploy code to EC2 instance
-      if: inputs.DEPLOY_EC2_INSTANCE != '' && inputs.ENV == 'dev' && steps.get-ec2-ip.outputs.ec2_ip != ''
+      if: inputs.ENV == 'dev' && steps.get-ec2-ip.outputs.ec2_ip != ''
       env:
         SSH_HOST: ${{ steps.get-ec2-ip.outputs.ec2_ip }}
       run: |
@@ -187,7 +187,7 @@ jobs:
       - build-push   # required to wait when the main job is done
       - deploy
     runs-on: ubuntu-latest
-    if: needs.start-runner.outputs.label != '' && always() # required to stop the runner even if the error happened in the previous jobs
+    if: always() && needs.start-runner.outputs.label != '' # required to stop the runner even if the error happened in the previous jobs
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
