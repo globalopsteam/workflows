@@ -58,6 +58,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AWS_IAM_ROLE }}
+          role-duration-seconds: 3600
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Start EC2 runner
@@ -194,6 +195,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           role-to-assume: ${{ secrets.AWS_IAM_ROLE }}
+          role-duration-seconds: 3600
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Stop EC2 runner
