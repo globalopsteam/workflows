@@ -63,7 +63,7 @@ jobs:
 
       - name: Start EC2 runner
         id: start-ec2-runner
-        uses: globalopsteam/ec2-github-runner@v2.3.0-na
+        uses: globalopsteam/ec2-github-runner@v2.3.2-na
         with:
           mode: start
           github-token: ${{ secrets.GH_RUNNER_TOKEN }}
@@ -199,7 +199,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Stop EC2 runner
-        uses: globalopsteam/ec2-github-runner@v2.3.0-na
+        uses: globalopsteam/ec2-github-runner@v2.3.2-na
         with:
           mode: stop
           github-token: ${{ secrets.GH_RUNNER_TOKEN }}
