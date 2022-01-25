@@ -172,7 +172,7 @@ jobs:
         echo "::set-output name=ec2_ip::$(aws ec2 describe-instances --query "Reservations[*].Instances[*].PrivateIpAddress" --filter "Name=tag:Name,Values=${{ inputs.DEPLOY_EC2_INSTANCE }}" --region "${{ secrets.AWS_REGION }}" --output=text)"
 
     - name: Deploy code to EC2 instance
-      if: inputs.DEPLOY_EC2_INSTANCE != '' && inputs.ENV == 'dev' && steps.get-ec2-ip.outputs.ec2_ip != ''
+      if: inputs.DEPLOY_EC2_INSTANCE != '' && steps.get-ec2-ip.outputs.ec2_ip != ''
       env:
         SSH_HOST: ${{ steps.get-ec2-ip.outputs.ec2_ip }}
       run: |
