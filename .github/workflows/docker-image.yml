@@ -43,6 +43,8 @@ on:
         required: true
       EC2_IAM_ROLE:
         required: true
+      S3_BUCKET:
+        required: true
 
 jobs:
   start-runner:
@@ -133,8 +135,8 @@ jobs:
         ENV: ${{ inputs.ENV }}
         DEPLOYMENT_JSON: "${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.json"
         DEPLOYMENT_TAR: "${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.tgz"
-        DEPLOYMENT_S3_JSON: "s3://globalops-deployment-metadata/${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.json"
-        DEPLOYMENT_S3_TAR: "s3://globalops-deployment-metadata/${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.tgz"
+        DEPLOYMENT_S3_JSON: "s3://${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.json"
+        DEPLOYMENT_S3_TAR: "s3://${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.tgz"
       run: |
         echo "Creating environment file for docker-compose" >&2
         echo "AWS_REGION=${{ secrets.AWS_REGION }}" > ".env"
@@ -152,8 +154,8 @@ jobs:
         echo '"}' >> ".deployment.json"
 
         echo "Updating deployment metadata: ${DEPLOYMENT_S3_JSON} ${DEPLOYMENT_S3_TAR}" >&2
-        if [ "$(aws s3api head-object --bucket globalops-deployment-metadata --key "${DEPLOYMENT_JSON}" | awk '/"githash":/ { print $2 }' | cut -f2 -d'"' || true)" != "${{ github.sha }}" ]; then aws s3 cp --metadata "githash=${{ github.sha }}" ".deployment.json" "${DEPLOYMENT_S3_JSON}"; fi
-        if [ "$(aws s3api head-object --bucket globalops-deployment-metadata --key "${DEPLOYMENT_TAR}" | awk '/"githash":/ { print $2 }' | cut -f2 -d'"' || true)" != "${{ github.sha }}" ]; then aws s3 cp --metadata "githash=${{ github.sha }}" ".archive.tgz" "${DEPLOYMENT_S3_TAR}"; fi
+        if [ "$(aws s3api head-object --bucket '${{ secrets.S3_BUCKET }}' --key "${DEPLOYMENT_JSON}" | awk '/"githash":/ { print $2 }' | cut -f2 -d'"' || true)" != "${{ github.sha }}" ]; then aws s3 cp --metadata "githash=${{ github.sha }}" ".deployment.json" "${DEPLOYMENT_S3_JSON}"; fi
+        if [ "$(aws s3api head-object --bucket '${{ secrets.S3_BUCKET }}' --key "${DEPLOYMENT_TAR}" | awk '/"githash":/ { print $2 }' | cut -f2 -d'"' || true)" != "${{ github.sha }}" ]; then aws s3 cp --metadata "githash=${{ github.sha }}" ".archive.tgz" "${DEPLOYMENT_S3_TAR}"; fi
 
 
   deploy:
