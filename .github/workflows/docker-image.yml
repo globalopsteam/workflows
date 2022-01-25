@@ -180,7 +180,7 @@ jobs:
         RUN=0; while [[ "${RUN}" -lt "10" ]]; do ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "ubuntu@${SSH_HOST}" "test" && break || { echo "Waiting 30 seconds to try SSH connection again" >&2; sleep 30; }; RUN=$((RUN + 1)); done; [[ "${RUN}" -ge "10" ]] && exit 255
 
         echo "Deploying Code" >&2
-        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "ubuntu@${SSH_HOST}" "${{ inputs.ECR_REPOSITORY }}" < ".archive.tgz"
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "ubuntu@${SSH_HOST}" "${{ inputs.ECR_REPOSITORY }}@${{ inputs.ENV }}" < ".archive.tgz"
 
   stop-runner:
     name: Stop runner
