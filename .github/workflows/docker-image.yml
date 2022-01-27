@@ -106,30 +106,35 @@ jobs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        docker manifest inspect $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG > /dev/null && echo "::set-output name=exists::true" || echo "::set-output name=exists::false"
+        MANIFEST=$(aws ecr batch-get-image --repository-name "${ECR_REPOSITORY}" --image-ids "imageTag=${IMAGE_TAG}" --query images[].imageManifest --output text)
+        [[ -n "${MANIFEST}" ]] && echo "::set-output name=exists::true" || echo "::set-output name=exists::false"
         echo "::set-output name=tag::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
         echo "::set-output name=branch::$ECR_REGISTRY/$ECR_REPOSITORY:${{ inputs.ENV }}"
         echo "::set-output name=latest::$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
     - name: Build image
-      if: inputs.DEPLOY_EC2_INSTANCE == '' || steps.check-ecr.outputs.exists == 'false'
+      if: steps.check-ecr.outputs.exists == 'false'
       env:
         IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
       run: |
         docker build -t "${IMAGE_FULL_TAG}" .
 
-    - name: Tag and push image to Amazon ECR
-      if: inputs.DEPLOY_EC2_INSTANCE == '' || steps.check-ecr.outputs.exists == 'false'
+    - name: Push image to Amazon ECR
+      if: steps.check-ecr.outputs.exists == 'false'
       env:
         IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
-        IMAGE_FULL_BRANCH: ${{ steps.check-ecr.outputs.branch }}
-        IMAGE_FULL_LATEST: ${{ steps.check-ecr.outputs.latest }}
       run: |
-        docker tag "${IMAGE_FULL_TAG}" "${IMAGE_FULL_BRANCH}"
-        docker tag "${IMAGE_FULL_TAG}" "${IMAGE_FULL_LATEST}"
         docker push "${IMAGE_FULL_TAG}"
-        docker push "${IMAGE_FULL_BRANCH}"
-        docker push "${IMAGE_FULL_LATEST}"
+
+    - name: Tag image in Amazon ECR
+      env:
+        IMAGE_TAG: ${{ github.sha }}
+        ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
+      run: |
+        MANIFEST=$(aws ecr batch-get-image --repository-name "${ECR_REPOSITORY}" --image-ids "imageTag=${IMAGE_TAG}" --query images[].imageManifest --output text)
+        aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "${{ inputs.ENV }}" --image-manifest "${MANIFEST}" || true
+        aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "latest" --image-manifest "${MANIFEST}" || true
+
 
     - name: Prepare for deployment
       if: inputs.DEPLOY_EC2_INSTANCE != ''
