@@ -112,6 +112,13 @@ jobs:
         echo "::set-output name=branch::$ECR_REGISTRY/$ECR_REPOSITORY:${{ inputs.ENV }}"
         echo "::set-output name=latest::$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
+    - name: Validate production image already exists
+      if: inputs.ENV == 'prod' && steps.check-ecr.outputs.exists == 'false'
+      uses: actions/github-script@v3
+      with:
+        script: |
+          core.setFailed('Production image does not exist already; are master and production branches in sync?')
+
     - name: Build image
       if: steps.check-ecr.outputs.exists == 'false'
       env:
