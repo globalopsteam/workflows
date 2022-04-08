@@ -128,8 +128,7 @@ jobs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ENV: ${{ inputs.ENV }}
       run: |
-        sed -e "s/\${ECR_REGISTRY}/${ECR_REGISTRY}/g" -e "s/\${ENV}/${ENV}/g" -i Dockerfile
-        docker build -t "${IMAGE_FULL_TAG}" .
+        docker build --build-arg "ECR_REGISTRY=${ECR_REGISTRY}" --build-arg "ENV=${ENV}" -t "${IMAGE_FULL_TAG}" .
 
     - name: Push image to Amazon ECR
       if: steps.check-ecr.outputs.exists == 'false'
