@@ -128,7 +128,7 @@ jobs:
           core.setFailed('Production image does not exist already; are master and production branches in sync?')
 
     - name: Build image
-      if: steps.check-ecr.outputs.exists == 'false'
+      if: inputs.ENV == 'dev' || steps.check-ecr.outputs.exists == 'false'
       env:
         IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -137,7 +137,7 @@ jobs:
         docker build --build-arg "ECR_REGISTRY=${ECR_REGISTRY}" --build-arg "ENV=${ENV}" -t "${IMAGE_FULL_TAG}" .
 
     - name: Push image to Amazon ECR
-      if: steps.check-ecr.outputs.exists == 'false'
+      if: inputs.ENV == 'dev' || steps.check-ecr.outputs.exists == 'false'
       env:
         IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
       run: |
