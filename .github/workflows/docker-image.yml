@@ -93,6 +93,11 @@ jobs:
         submodules: 'recursive'
         token: ${{ secrets.GH_RUNNER_TOKEN }}
 
+    - name: Update remote submodules
+      if: inputs.ENV == 'dev'
+      run: |
+        git submodule update --remote
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
