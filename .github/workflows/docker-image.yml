@@ -170,7 +170,7 @@ jobs:
         echo "AWS_REGION=${{ secrets.AWS_REGION }}" > ".env"
         echo "DOCKERHOME=/home/ubuntu" >> ".env"
         echo "ENV=${ENV}" >> ".env"
-        echo "ECR_REPOSITORY=${ECR_REPOSITORY}" >> ".env"
+        echo "ECR_REGISTRY=${ECR_REGISTRY}" >> ".env"
         echo "IMAGE_FULL_TAG=${IMAGE_FULL_TAG}" >> ".env"
         echo "IMAGE_FULL_BRANCH=${IMAGE_FULL_BRANCH}" >> ".env"
         echo "IMAGE_FULL_LATEST=${IMAGE_FULL_LATEST}" >> ".env"
