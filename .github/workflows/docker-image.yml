@@ -156,6 +156,7 @@ jobs:
     - name: Prepare for deployment
       if: inputs.DEPLOY_EC2_INSTANCE != ''
       env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
         IMAGE_FULL_BRANCH: ${{ steps.check-ecr.outputs.branch }}
         IMAGE_FULL_LATEST: ${{ steps.check-ecr.outputs.latest }}
@@ -169,6 +170,7 @@ jobs:
         echo "AWS_REGION=${{ secrets.AWS_REGION }}" > ".env"
         echo "DOCKERHOME=/home/ubuntu" >> ".env"
         echo "ENV=${ENV}" >> ".env"
+        echo "ECR_REPOSITORY=${ECR_REPOSITORY}" >> ".env"
         echo "IMAGE_FULL_TAG=${IMAGE_FULL_TAG}" >> ".env"
         echo "IMAGE_FULL_BRANCH=${IMAGE_FULL_BRANCH}" >> ".env"
         echo "IMAGE_FULL_LATEST=${IMAGE_FULL_LATEST}" >> ".env"
