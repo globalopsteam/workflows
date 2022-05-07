@@ -167,16 +167,17 @@ jobs:
         DEPLOYMENT_S3_TAR: "s3://${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.tgz"
       run: |
         echo "Creating environment file for docker-compose" >&2
-        echo "AWS_REGION=${{ secrets.AWS_REGION }}" > ".env"
-        echo "DOCKERHOME=/home/ubuntu" >> ".env"
-        echo "ENV=${ENV}" >> ".env"
-        echo "ECR_REGISTRY=${ECR_REGISTRY}" >> ".env"
-        echo "IMAGE_FULL_TAG=${IMAGE_FULL_TAG}" >> ".env"
-        echo "IMAGE_FULL_BRANCH=${IMAGE_FULL_BRANCH}" >> ".env"
-        echo "IMAGE_FULL_LATEST=${IMAGE_FULL_LATEST}" >> ".env"
+        echo "AWS_REGION=${{ secrets.AWS_REGION }}" > ".env.build"
+        echo "DOCKERHOME=/home/ubuntu" >> ".env.build"
+        echo "ENV=${ENV}" >> ".env.build"
+        echo "ECR_REGISTRY=${ECR_REGISTRY}" >> ".env.build"
+        echo "IMAGE_FULL_TAG=${IMAGE_FULL_TAG}" >> ".env.build"
+        echo "IMAGE_FULL_BRANCH=${IMAGE_FULL_BRANCH}" >> ".env.build"
+        echo "IMAGE_FULL_LATEST=${IMAGE_FULL_LATEST}" >> ".env.build"
 
         echo "Creating archive for deployment" >&2
-        tar -c ".env" "docker-compose.yml" ${{ inputs.DEPLOY_TAR_FILES_EXTRA }} | gzip -9 > ".archive.tgz"
+        ln -sfv ".env.build" ".env"
+        tar -c ".env" ".env.build" "docker-compose.yml" ${{ inputs.DEPLOY_TAR_FILES_EXTRA }} | gzip -9 > ".archive.tgz"
 
         echo "Preparing deployment JSON"
         echo -n '{"archive":"' > ".deployment.json"
