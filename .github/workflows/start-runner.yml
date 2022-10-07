@@ -29,8 +29,12 @@ on:
         required: true
 
     outputs:
-      label: ${{ jobs.start-runner.outputs.label }}
-      ec2-instance-id: ${{ jobs.start-runner.outputs.ec2-instance-id }}
+      label:
+        description: "GitHub Runner Label"
+        value: ${{ jobs.start-runner.outputs.label }}
+      ec2-instance-id:
+        description: "GitHub Runner EC2 Instance ID"
+        value: ${{ jobs.start-runner.outputs.ec2-instance-id }}
 
 jobs:
   start-runner:
