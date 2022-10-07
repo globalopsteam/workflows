@@ -48,7 +48,7 @@ on:
 
 jobs:
   start-runner:
-#    name: Start runner
+    name: Runner
     uses: globalopsteam/workflows/.github/workflows/start-runner.yml@master
     with:
       EC2_INSTANCE_TYPE: ${{ inputs.EC2_INSTANCE_TYPE }}
@@ -196,7 +196,7 @@ jobs:
         ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "ubuntu@${SSH_HOST}" "${{ inputs.ECR_REPOSITORY }}@${{ inputs.ENV }}" < ".archive.tgz"
 
   stop-runner:
-#    name: Stop runner
+    name: Runner
     needs:
       - start-runner # required to get output from the start-runner job
       - build-push   # required to wait when the main job is done
