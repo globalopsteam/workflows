@@ -1,0 +1,214 @@
+name: Build docker image, push to AWS ECR, and deploy code
+
+on:
+  workflow_call:
+    inputs:
+      ENV:
+        required: false
+        default: 'dev'
+        type: string
+      ECR_REPOSITORY:
+        required: true
+        type: string
+      DEPLOY_EC2_INSTANCE:
+        default: ''
+        required: false
+        type: string
+      DEPLOY_TAR_FILES_EXTRA:
+        default: ''
+        required: false
+        type: string
+      EC2_INSTANCE_TYPE:
+        default: 't3a.micro'
+        required: false
+        type: string
+
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      GH_RUNNER_TOKEN:
+        required: true
+
+      AWS_REGION:
+        required: true
+      AWS_IAM_ROLE:
+        required: false
+      EC2_IMAGE:
+        required: true
+      EC2_SUBNET:
+        required: true
+      EC2_SECURITY_GROUP:
+        required: true
+      EC2_IAM_ROLE:
+        required: true
+      S3_BUCKET:
+        required: true
+
+jobs:
+  start-runner:
+    name: Start runner
+    uses: globalopsteam/workflows/.github/workflows/start-runner.yml@${{ inpuits.ENV == 'prod' ? 'production' : 'master' }}
+    with:
+      EC2_INSTANCE_TYPE: ${{ inputs.EC2_INSTANCE_TYPE }}
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_IAM_ROLE: ${{ secrets.AWS_IAM_ROLE }}
+      EC2_IMAGE: ${{ secrets.EC2_IMAGE }}
+      EC2_SUBNET: ${{ secrets.EC2_SUBNET }}
+      EC2_SECURITY_GROUP: ${{ secrets.EC2_SECURITY_GROUP }}
+      EC2_IAM_ROLE: ${{ secrets.EC2_IAM_ROLE }}
+
+  build-push:
+    name: Build + Push
+    needs: start-runner
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+        token: ${{ secrets.GH_RUNNER_TOKEN }}
+
+    - name: Update remote submodules
+      if: inputs.ENV == 'dev'
+      run: |
+        git submodule update --remote
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Check if image exists in Amazon ECR
+      id: check-ecr
+      env:
+        ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        MANIFEST=$(aws ecr batch-get-image --repository-name "${ECR_REPOSITORY}" --image-ids "imageTag=${IMAGE_TAG}" --query images[].imageManifest --output text)
+        [[ -n "${MANIFEST}" ]] && echo "::set-output name=exists::true" || echo "::set-output name=exists::false"
+        echo "::set-output name=tag::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+        echo "::set-output name=branch::$ECR_REGISTRY/$ECR_REPOSITORY:${{ inputs.ENV }}"
+        echo "::set-output name=latest::$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+
+    - name: Validate production image already exists
+      if: inputs.ENV == 'prod' && steps.check-ecr.outputs.exists == 'false'
+      uses: actions/github-script@v3
+      with:
+        script: |
+          core.setFailed('Production image does not exist already; are master and production branches in sync?')
+
+    - name: Build image
+      if: inputs.ENV == 'dev' || steps.check-ecr.outputs.exists == 'false'
+      env:
+        IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ENV: ${{ inputs.ENV }}
+      run: |
+        docker build --build-arg "ECR_REGISTRY=${ECR_REGISTRY}" --build-arg "ENV=${ENV}" -t "${IMAGE_FULL_TAG}" .
+
+    - name: Push image to Amazon ECR
+      if: inputs.ENV == 'dev' || steps.check-ecr.outputs.exists == 'false'
+      env:
+        IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
+      run: |
+        docker push "${IMAGE_FULL_TAG}"
+
+    - name: Tag image in Amazon ECR
+      env:
+        IMAGE_TAG: ${{ github.sha }}
+        ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
+      run: |
+        MANIFEST=$(aws ecr batch-get-image --repository-name "${ECR_REPOSITORY}" --image-ids "imageTag=${IMAGE_TAG}" --query images[].imageManifest --output text)
+        aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "${{ inputs.ENV }}" --image-manifest "${MANIFEST}" > /dev/null || true
+        aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "latest" --image-manifest "${MANIFEST}" > /dev/null || true
+
+
+    - name: Prepare for deployment
+      if: inputs.DEPLOY_EC2_INSTANCE != ''
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
+        IMAGE_FULL_BRANCH: ${{ steps.check-ecr.outputs.branch }}
+        IMAGE_FULL_LATEST: ${{ steps.check-ecr.outputs.latest }}
+        ENV: ${{ inputs.ENV }}
+        DEPLOYMENT_JSON: "${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.json"
+        DEPLOYMENT_TAR: "${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.tgz"
+        DEPLOYMENT_S3_JSON: "s3://${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.json"
+        DEPLOYMENT_S3_TAR: "s3://${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.tgz"
+      run: |
+        echo "Creating environment file for docker-compose" >&2
+        echo "AWS_REGION=${{ secrets.AWS_REGION }}" > ".env.build"
+        echo "DOCKERHOME=/home/ubuntu" >> ".env.build"
+        echo "ENV=${ENV}" >> ".env.build"
+        echo "ECR_REGISTRY=${ECR_REGISTRY}" >> ".env.build"
+        echo "IMAGE_FULL_TAG=${IMAGE_FULL_TAG}" >> ".env.build"
+        echo "IMAGE_FULL_BRANCH=${IMAGE_FULL_BRANCH}" >> ".env.build"
+        echo "IMAGE_FULL_LATEST=${IMAGE_FULL_LATEST}" >> ".env.build"
+
+        echo "Creating archive for deployment" >&2
+        ln -sfv ".env.build" ".env"
+        tar -c ".env" ".env.build" "docker-compose.yml" ${{ inputs.DEPLOY_TAR_FILES_EXTRA }} | gzip -9 > ".archive.tgz"
+
+        echo "Preparing deployment JSON"
+        echo -n '{"archive":"' > ".deployment.json"
+        base64 -w 0 >> ".deployment.json" < ".archive.tgz"
+        echo '"}' >> ".deployment.json"
+
+        echo "Updating deployment metadata: ${DEPLOYMENT_S3_JSON} ${DEPLOYMENT_S3_TAR}" >&2
+        if [ "$(aws s3api head-object --bucket '${{ secrets.S3_BUCKET }}' --key "${DEPLOYMENT_JSON}" | awk '/"githash":/ { print $2 }' | cut -f2 -d'"' || true)" != "${{ github.sha }}" ]; then aws s3 cp --metadata "githash=${{ github.sha }}" ".deployment.json" "${DEPLOYMENT_S3_JSON}"; fi
+        if [ "$(aws s3api head-object --bucket '${{ secrets.S3_BUCKET }}' --key "${DEPLOYMENT_TAR}" | awk '/"githash":/ { print $2 }' | cut -f2 -d'"' || true)" != "${{ github.sha }}" ]; then aws s3 cp --metadata "githash=${{ github.sha }}" ".archive.tgz" "${DEPLOYMENT_S3_TAR}"; fi
+
+
+  deploy:
+    name: Deploy
+    needs:
+      - start-runner
+      - build-push
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    steps:
+    - name: Get EC2 instance IP address
+      if: inputs.DEPLOY_EC2_INSTANCE != ''
+      id: get-ec2-ip
+      run: |
+        echo "::set-output name=ec2_ip::$(aws ec2 describe-instances --query "Reservations[*].Instances[*].PrivateIpAddress" --filter "Name=tag:Name,Values=${{ inputs.DEPLOY_EC2_INSTANCE }}" --region "${{ secrets.AWS_REGION }}" --output=text)"
+
+    - name: Deploy code to EC2 instance
+      if: inputs.DEPLOY_EC2_INSTANCE != '' && steps.get-ec2-ip.outputs.ec2_ip != ''
+      env:
+        SSH_HOST: ${{ steps.get-ec2-ip.outputs.ec2_ip }}
+      run: |
+        echo "Testing SSH connection" >&2
+        RUN=0; while [[ "${RUN}" -lt "10" ]]; do ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "ubuntu@${SSH_HOST}" "test" && break || { echo "Waiting 30 seconds to try SSH connection again" >&2; sleep 30; }; RUN=$((RUN + 1)); done; [[ "${RUN}" -ge "10" ]] && exit 255
+
+        echo "Deploying Code" >&2
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "ubuntu@${SSH_HOST}" "${{ inputs.ECR_REPOSITORY }}@${{ inputs.ENV }}" < ".archive.tgz"
+
+  stop-runner:
+    name: Stop runner
+    needs:
+      - start-runner # required to get output from the start-runner job
+      - build-push   # required to wait when the main job is done
+      - deploy
+    if: always() && needs.start-runner.outputs.label != '' # required to stop the runner even if the error happened in the previous jobs
+    uses: globalopsteam/workflows/.github/workflows/stop-runner.yml@{{ inpuits.ENV == 'prod' ? 'production' : 'master' }}
+    with:
+      EC2_INSTANCE_ID: ${{ needs.start-runner.outputs.ec2-instance-id }}
+      RUNNER_LABEL: ${{ needs.start-runner.outputs.label }}
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_IAM_ROLE: ${{ secrets.AWS_IAM_ROLE }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
