@@ -49,7 +49,7 @@ on:
 jobs:
   start-runner:
     name: Start runner
-    uses: globalopsteam/workflows/.github/workflows/start-runner.yml@${{ inpuits.ENV == 'prod' ? 'production' : 'master' }}
+    uses: globalopsteam/workflows/.github/workflows/start-runner.yml@${{ inpuits.ENV == 'prod' && 'production' || 'master' }}
     with:
       EC2_INSTANCE_TYPE: ${{ inputs.EC2_INSTANCE_TYPE }}
     secrets:
@@ -202,7 +202,7 @@ jobs:
       - build-push   # required to wait when the main job is done
       - deploy
     if: always() && needs.start-runner.outputs.label != '' # required to stop the runner even if the error happened in the previous jobs
-    uses: globalopsteam/workflows/.github/workflows/stop-runner.yml@{{ inpuits.ENV == 'prod' ? 'production' : 'master' }}
+    uses: globalopsteam/workflows/.github/workflows/stop-runner.yml@{{ inpuits.ENV == 'prod' && 'production' || 'master' }}
     with:
       EC2_INSTANCE_ID: ${{ needs.start-runner.outputs.ec2-instance-id }}
       RUNNER_LABEL: ${{ needs.start-runner.outputs.label }}
