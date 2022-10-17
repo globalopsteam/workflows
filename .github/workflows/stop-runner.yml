@@ -38,7 +38,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Stop EC2 runner
-        uses: globalopsteam/ec2-github-runner@v2.3.2-na
+        uses: globalopsteam/ec2-github-runner@v2-na
         with:
           mode: stop
           github-token: ${{ secrets.GH_RUNNER_TOKEN }}

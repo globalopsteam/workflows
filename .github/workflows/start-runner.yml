@@ -55,7 +55,7 @@ jobs:
 
       - name: Start EC2 runner
         id: start-ec2-runner
-        uses: globalopsteam/ec2-github-runner@v2.3.2-na
+        uses: globalopsteam/ec2-github-runner@v2-na
         with:
           mode: start
           github-token: ${{ secrets.GH_RUNNER_TOKEN }}
