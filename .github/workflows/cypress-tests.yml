@@ -91,19 +91,21 @@ jobs:
         yarn install --frozen-lockfile
 
   cypress-electron:
-    - name: Cypres Run (Electron)
-      needs:
-        - start-runner
-        - cypress-setup
-      runs-on: ${{ needs.start-runner.outputs.label }}
-      uses: cypress-io/github-action@v4
-      with:
-        browser: 'electron'
-        record: true
-        working-directory: ${{ inputs.CYPRESS_DIR }}
-      env:
-        CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    name: Cypres Run
+    needs:
+      - start-runner
+      - cypress-setup
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    steps:
+      - name: Electron
+      - uses: cypress-io/github-action@v4
+        with:
+          browser: 'electron'
+          record: true
+          working-directory: ${{ inputs.CYPRESS_DIR }}
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
   stop-runner:
