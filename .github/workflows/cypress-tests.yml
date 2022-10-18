@@ -1,0 +1,124 @@
+name: Run Cypress Tests
+
+on:
+  workflow_call:
+    inputs:
+      ENV:
+        required: false
+        default: 'dev'
+        type: string
+      EC2_INSTANCE_TYPE:
+        default: 'c6a.xlarge'
+        required: false
+        type: string
+      CYPRESS_DIR:
+        default: 'cypress/'
+        type: string
+
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      GH_RUNNER_TOKEN:
+        required: true
+
+      CYPRESS_RECORD_KEY:
+        required: true
+
+      AWS_REGION:
+        required: true
+      AWS_IAM_ROLE:
+        required: false
+      EC2_IMAGE:
+        required: true
+      EC2_SUBNET:
+        required: true
+      EC2_SECURITY_GROUP:
+        required: true
+      EC2_IAM_ROLE:
+        required: true
+      S3_BUCKET:
+        required: true
+
+jobs:
+  start-runner:
+    name: Runner
+    uses: globalopsteam/workflows/.github/workflows/start-runner.yml@master
+    with:
+      EC2_INSTANCE_TYPE: ${{ inputs.EC2_INSTANCE_TYPE }}
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_IAM_ROLE: ${{ secrets.AWS_IAM_ROLE }}
+      EC2_IMAGE: ${{ secrets.EC2_IMAGE }}
+      EC2_SUBNET: ${{ secrets.EC2_SUBNET }}
+      EC2_SECURITY_GROUP: ${{ secrets.EC2_SECURITY_GROUP }}
+      EC2_IAM_ROLE: ${{ secrets.EC2_IAM_ROLE }}
+
+  cypress-setup:
+    name: Cypress Setup
+    needs: start-runner
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    steps:
+    - name: Install yarn
+      env:
+        DEBIAN_FRONTEND: 'noninteractive'
+      run: |
+        curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+        echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+        sudo apt update -y && sudo apt install -y yarn
+
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+        token: ${{ secrets.GH_RUNNER_TOKEN }}
+
+    - name: Update remote submodules
+      if: inputs.ENV == 'dev'
+      run: |
+        git submodule update --remote
+
+    - name: Install cypress
+      env:
+        CYPRESS_DIR: ${{ inputs.CYPRESS_DIR }}
+      run: |
+        cd "${CYPRESS_DIR}"
+        yarn install --frozen-lockfile
+
+  cypress-electron:
+    - name: Cypres Run (Electron)
+      needs:
+        - start-runner
+        - cypress-setup
+      runs-on: ${{ needs.start-runner.outputs.label }}
+      uses: cypress-io/github-action@v4
+      with:
+        browser: 'electron'
+        record: true
+        working-directory: ${{ inputs.CYPRESS_DIR }}
+      env:
+        CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+  stop-runner:
+    name: Runner
+    needs:
+      - start-runner     # required to get output from the start-runner job
+      - cypress-electron # required to wait when the main job is done
+    if: always() && needs.start-runner.outputs.label != '' # required to stop the runner even if the error happened in the previous jobs
+    uses: globalopsteam/workflows/.github/workflows/stop-runner.yml@master
+    with:
+      EC2_INSTANCE_ID: ${{ needs.start-runner.outputs.ec2-instance-id }}
+      RUNNER_LABEL: ${{ needs.start-runner.outputs.label }}
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_IAM_ROLE: ${{ secrets.AWS_IAM_ROLE }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
