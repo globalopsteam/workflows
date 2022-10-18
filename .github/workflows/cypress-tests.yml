@@ -59,10 +59,13 @@ jobs:
       EC2_SECURITY_GROUP: ${{ secrets.EC2_SECURITY_GROUP }}
       EC2_IAM_ROLE: ${{ secrets.EC2_IAM_ROLE }}
 
-  cypress-setup:
-    name: Cypress Setup
-    needs: start-runner
+  cypress-electron:
+    name: Cypres Run
+    needs:
+      - start-runner
+      - cypress-setup
     runs-on: ${{ needs.start-runner.outputs.label }}
+    container: cypress/included:10.10.0
     steps:
     - name: Checkout
       uses: actions/checkout@v3
@@ -70,35 +73,39 @@ jobs:
         submodules: 'recursive'
         token: ${{ secrets.GH_RUNNER_TOKEN }}
 
-    - name: Update remote submodules
-      if: inputs.ENV == 'dev'
-      run: |
-        git submodule update --remote
-
-    - name: Install cypress
+    - name: Electron
+      uses: cypress-io/github-action@v4
+      with:
+        browser: 'electron'
+        record: true
+        working-directory: ${{ inputs.CYPRESS_DIR }}
       env:
-        CYPRESS_DIR: ${{ inputs.CYPRESS_DIR }}
-      run: |
-        cd "${CYPRESS_DIR}"
-        yarn install --frozen-lockfile
+        CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  cypress-electron:
+  cypress-chrome:
     name: Cypres Run
     needs:
       - start-runner
       - cypress-setup
     runs-on: ${{ needs.start-runner.outputs.label }}
+    container: cypress/included:10.10.0
     steps:
-      - name: Electron
-        uses: cypress-io/github-action@v4
-        with:
-          browser: 'electron'
-          record: true
-          working-directory: ${{ inputs.CYPRESS_DIR }}
-        env:
-          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+        token: ${{ secrets.GH_RUNNER_TOKEN }}
 
+    - name: Chrome
+      uses: cypress-io/github-action@v4
+      with:
+        browser: 'chrome'
+        record: true
+        working-directory: ${{ inputs.CYPRESS_DIR }}
+      env:
+        CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   stop-runner:
     name: Runner
