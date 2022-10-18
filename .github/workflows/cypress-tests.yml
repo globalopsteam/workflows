@@ -65,12 +65,8 @@ jobs:
     runs-on: ${{ needs.start-runner.outputs.label }}
     steps:
     - name: Install yarn
-      env:
-        DEBIAN_FRONTEND: 'noninteractive'
       run: |
-        curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-        echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-        sudo apt update -y && sudo apt install -y yarn
+        sudo npm install --global yarn
 
     - name: Checkout
       uses: actions/checkout@v3
