@@ -60,10 +60,9 @@ jobs:
       EC2_IAM_ROLE: ${{ secrets.EC2_IAM_ROLE }}
 
   cypress-electron:
-    name: Cypres Run
+    name: Cypres Run - Electron
     needs:
       - start-runner
-      - cypress-setup
     runs-on: ${{ needs.start-runner.outputs.label }}
     container: cypress/included:10.10.0
     steps:
@@ -73,7 +72,7 @@ jobs:
         submodules: 'recursive'
         token: ${{ secrets.GH_RUNNER_TOKEN }}
 
-    - name: Electron
+    - name: Run
       uses: cypress-io/github-action@v4
       with:
         browser: 'electron'
@@ -84,10 +83,9 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   cypress-chrome:
-    name: Cypres Run
+    name: Cypres Run - Chrome
     needs:
       - start-runner
-      - cypress-setup
     runs-on: ${{ needs.start-runner.outputs.label }}
     container: cypress/included:10.10.0
     steps:
@@ -97,7 +95,7 @@ jobs:
         submodules: 'recursive'
         token: ${{ secrets.GH_RUNNER_TOKEN }}
 
-    - name: Chrome
+    - name: Run
       uses: cypress-io/github-action@v4
       with:
         browser: 'chrome'
