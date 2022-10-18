@@ -64,6 +64,7 @@ jobs:
           subnet-id: ${{ secrets.EC2_SUBNET }}
           security-group-id: ${{ secrets.EC2_SECURITY_GROUP }}
           iam-role-name: ${{ secrets.EC2_IAM_ROLE }}
+          runner-home-dir: /github-runner
           aws-resource-tags: >
             [
               {"Key": "Name", "Value": "github-runner"},
