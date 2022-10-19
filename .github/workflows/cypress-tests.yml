@@ -60,7 +60,7 @@ jobs:
       EC2_IAM_ROLE: ${{ secrets.EC2_IAM_ROLE }}
 
   cypress-run:
-    name: Cypress Run
+    name: Run
     needs:
       - start-runner
     runs-on: ${{ needs.start-runner.outputs.label }}
@@ -75,10 +75,10 @@ jobs:
         submodules: 'recursive'
         token: ${{ secrets.GH_RUNNER_TOKEN }}
 
-    - name: ${{ matrix.browser }}
+    - name: Cypress Run
       uses: cypress-io/github-action@v4
       with:
-        browser: Run
+        browser: ${{ matrix.browser }}
         record: true
         working-directory: ${{ inputs.CYPRESS_DIR }}
       env:
