@@ -82,7 +82,7 @@ jobs:
 
       - name: Fetch cypress environment json
         run: |
-          aws s3 cp "${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ steps.s3_suffix.outputs.repo }}/cypress.env.json" "cypress.env.json"
+          aws s3 cp "s3://${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ steps.s3_suffix.outputs.repo }}/cypress.env.json" "cypress.env.json"
 
   cypress-run:
     name: Run
