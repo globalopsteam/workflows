@@ -59,22 +59,42 @@ jobs:
       EC2_SECURITY_GROUP: ${{ secrets.EC2_SECURITY_GROUP }}
       EC2_IAM_ROLE: ${{ secrets.EC2_IAM_ROLE }}
 
+  cypress-setup:
+    name: Setup
+    needs:
+      - start-runner
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    steps:
+      - name: Fetch docker image
+        run: |
+          docker pull "cypress/included:10.10.0"
+
+      - name: Set S3 repo suffuix
+        id: s3_suffix
+        run: |
+          echo "repo=$(basename '${{ github.repository }}' | sed 's/^docker-//')" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+          token: ${{ secrets.GH_RUNNER_TOKEN }}
+
+      - name: Fetch cypress environment json
+        run: |
+          aws s3 cp "${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ steps.s3_suffix.outputs.repo }}/cypress.env.json" "cypress.env.json"
+
   cypress-run:
     name: Run
     needs:
       - start-runner
+      - cypress-setup
     runs-on: ${{ needs.start-runner.outputs.label }}
     container: cypress/included:10.10.0
     strategy:
       matrix:
         browser: ['electron', 'chrome', 'firefox']
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-      with:
-        submodules: 'recursive'
-        token: ${{ secrets.GH_RUNNER_TOKEN }}
-
     - name: Cypress Run
       uses: cypress-io/github-action@v4
       with:
@@ -89,6 +109,7 @@ jobs:
     name: Runner
     needs:
       - start-runner     # required to get output from the start-runner job
+      - cypress-setup
       - cypress-run
     if: always() && needs.start-runner.outputs.label != '' # required to stop the runner even if the error happened in the previous jobs
     uses: globalopsteam/workflows/.github/workflows/stop-runner.yml@master
