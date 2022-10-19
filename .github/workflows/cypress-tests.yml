@@ -12,7 +12,7 @@ on:
         required: false
         type: string
       CYPRESS_DIR:
-        default: 'cypress/'
+        default: 'cypress'
         type: string
 
     secrets:
@@ -82,7 +82,7 @@ jobs:
 
       - name: Fetch cypress environment json
         run: |
-          aws s3 cp "s3://${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ steps.s3_suffix.outputs.repo }}/cypress.env.json" "cypress.env.json"
+          aws s3 cp "s3://${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ steps.s3_suffix.outputs.repo }}/cypress.env.json" "${{ inputs.CYPRESS_DIR }}/cypress.env.json"
 
   cypress-run:
     name: Run
