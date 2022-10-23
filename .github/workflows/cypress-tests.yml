@@ -74,6 +74,13 @@ jobs:
         run: |
           docker pull "cypress/included:10.10.0"
 
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+          ref: ${{ github.event_name != 'schedule' && github.ref || inputs.ENV == 'prod' && 'refs/heads/production' || 'refs/heads/dev' }}
+          token: ${{ secrets.GH_RUNNER_TOKEN }}
+
       - name: Configure Environment
         id: env_setup
         env:
@@ -82,13 +89,6 @@ jobs:
         run: |
           echo repo=$(basename "${REPO}" | sed 's/^docker-//') >> "${GITHUB_OUTPUT}"
           echo commit_message=$(git -C "${APP_DIR}" log -n1 --format="%s") >> "${GITHUB_OUTPUT}"
-
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: 'recursive'
-          ref: ${{ github.event_name != 'schedule' && github.ref || inputs.ENV == 'prod' && 'refs/heads/production' || 'refs/heads/dev' }}
-          token: ${{ secrets.GH_RUNNER_TOKEN }}
 
       - name: Fetch cypress environment json
         run: |
