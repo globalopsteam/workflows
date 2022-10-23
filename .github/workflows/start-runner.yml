@@ -5,7 +5,9 @@ on:
     inputs:
       EC2_INSTANCE_TYPE:
         required: true
-        type: string
+      RUNNER_COUNT:
+        required: false
+        default: 1
 
     secrets:
       AWS_ACCESS_KEY_ID:
@@ -61,6 +63,7 @@ jobs:
           security-group-id: ${{ secrets.EC2_SECURITY_GROUP }}
           iam-role-name: ${{ secrets.EC2_IAM_ROLE }}
           runner-tar-file: /root/actions-runner-linux-x64-2.298.2.tar.gz
+          runner-count: ${{ inputs.RUNNER_COUNT }}
           aws-resource-tags: >
             [
               {"Key": "Name", "Value": "github-runner"},
