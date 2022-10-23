@@ -68,7 +68,7 @@ jobs:
       - start-runner
     runs-on: ${{ needs.start-runner.outputs.label }}
     outputs:
-      branch: ${{ steps.env_setup.outputs.branch }}
+      branch: ${{ steps.env_setup.outputs.branch != 'HEAD' && steps.env_setup.outputs.branch || inputs.ENV == 'prod' && 'production' || inputs.ENV == 'stage' && 'master' || inputs.env == 'dev' && 'dev' || github.ref_name }}
       subject: ${{ steps.env_setup.outputs.subject }}
       author: ${{ steps.env_setup.outputs.author }}
       email: ${{ steps.env_setup.outputs.email }}
