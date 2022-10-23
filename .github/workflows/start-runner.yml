@@ -5,9 +5,11 @@ on:
     inputs:
       EC2_INSTANCE_TYPE:
         required: true
+        type: string
       RUNNER_COUNT:
         required: false
         default: 1
+        type: number
 
     secrets:
       AWS_ACCESS_KEY_ID:
