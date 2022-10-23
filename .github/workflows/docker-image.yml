@@ -67,7 +67,7 @@ jobs:
   build-push:
     name: Build + Push
     needs: start-runner
-    runs-on: ${{ needs.start-runner.outputs.label }}
+    runs-on: ${{ needs.start-runner.outputs.ec2-instance-id }}
     steps:
     - name: Checkout
       uses: actions/checkout@v3
@@ -176,7 +176,7 @@ jobs:
     needs:
       - start-runner
       - build-push
-    runs-on: ${{ needs.start-runner.outputs.label }}
+    runs-on: ${{ needs.start-runner.outputs.ec2-instance-id }}
     steps:
     - name: Get EC2 instance IP address
       if: inputs.DEPLOY_EC2_INSTANCE != ''
@@ -201,11 +201,10 @@ jobs:
       - start-runner # required to get output from the start-runner job
       - build-push   # required to wait when the main job is done
       - deploy
-    if: always() && needs.start-runner.outputs.label != '' # required to stop the runner even if the error happened in the previous jobs
+    if: always() && needs.start-runner.outputs.ec2-instance-id != '' # required to stop the runner even if the error happened in the previous jobs
     uses: globalopsteam/workflows/.github/workflows/stop-runner.yml@master
     with:
       EC2_INSTANCE_ID: ${{ needs.start-runner.outputs.ec2-instance-id }}
-      RUNNER_LABEL: ${{ needs.start-runner.outputs.label }}
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_IAM_ROLE: ${{ secrets.AWS_IAM_ROLE }}
