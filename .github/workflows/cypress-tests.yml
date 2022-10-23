@@ -14,6 +14,9 @@ on:
       CYPRESS_DIR:
         default: 'cypress'
         type: string
+      APP_DIR:
+        default: '.'
+        type: string
 
     secrets:
       AWS_ACCESS_KEY_ID:
@@ -64,15 +67,21 @@ jobs:
     needs:
       - start-runner
     runs-on: ${{ needs.start-runner.outputs.label }}
+    outputs:
+      commit_message: ${{ steps.env_setup.outputs.commit_message }}
     steps:
       - name: Fetch docker image
         run: |
           docker pull "cypress/included:10.10.0"
 
-      - name: Set S3 repo suffuix
-        id: s3_suffix
+      - name: Configure Environment
+        id: env_setup
+        env:
+          APP_DIR: "${{ inputs.APP_DIR }}"
+          REPO: "${{ github.repository }}"
         run: |
-          echo "repo=$(basename '${{ github.repository }}' | sed 's/^docker-//')" >> "${GITHUB_OUTPUT}"
+          echo repo=$(basename "${REPO}" | sed 's/^docker-//') >> "${GITHUB_OUTPUT}"
+          echo commit_message=$(git -C "${APP_DIR}" log -n1 --format="%s") >> "${GITHUB_OUTPUT}"
 
       - name: Checkout
         uses: actions/checkout@v3
@@ -83,7 +92,7 @@ jobs:
 
       - name: Fetch cypress environment json
         run: |
-          aws s3 cp "s3://${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ steps.s3_suffix.outputs.repo }}/cypress.env.json" "${{ inputs.CYPRESS_DIR }}/cypress.env.json"
+          aws s3 cp "s3://${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ steps.env_setup.outputs.repo }}/cypress.env.json" "${{ inputs.CYPRESS_DIR }}/cypress.env.json"
 
   cypress-run:
     name: Run
@@ -105,6 +114,7 @@ jobs:
       env:
         CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        COMMIT_INFO_MESSAGE: ${{ needs.cypress-setup.outputs.commit_message }}
 
   stop-runner:
     name: Runner
