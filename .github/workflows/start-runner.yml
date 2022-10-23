@@ -67,10 +67,10 @@ jobs:
           runner-tar-file: /root/actions-runner-linux-x64-2.298.2.tar.gz
           runner-count: ${{ inputs.RUNNER_COUNT }}
           aws-resource-tags: >
-            [
-              {"Key": "Name", "Value": "github-runner"},
-              {"Key": "Service", "Value": "ec2-github-runner"},
-              {"Key": "GitHubRepository", "Value": "${{ github.repository }}"},
-              {"Key": "GitHash", "Value": "${{ github.sha }}"}
-            ]
+            {
+              "Name": "github-runner",
+              "Service": "ec2-github-runner",
+              "GitHubRepository": "${{ github.repository }}",
+              "GitHash": "${{ github.sha }}"
+            }
 
