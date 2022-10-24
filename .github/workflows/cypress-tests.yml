@@ -83,7 +83,7 @@ jobs:
       - name: Fetch cypress environment json
         env:
           ENV: "${{ inputs.ENV }}"
-          REPO: "${{ steps.env_setup.outputs.repo }}"
+          REPO: "${{ steps.s3_suffix.outputs.repo }}"
           S3_BUCKET: "${{ secrets.S3_BUCKET }}"
 
         run: |
