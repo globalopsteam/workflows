@@ -139,7 +139,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: cypress_env
-          path: "${{ inputs.CYPRESS_DIR }}/cypress.env.json"
+          path: "${{ inputs.CYPRESS_DIR }}"
 
       - name: Cypress Run
         uses: cypress-io/github-action@v4
