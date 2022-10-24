@@ -123,28 +123,29 @@ jobs:
         id: env_setup
         env:
           APP_DIR: "${{ inputs.APP_DIR }}"
-          EVENT_NAME: "${{ github.event_name }}"
+          CYPRESS_DIR: "${{ inputs.CYPRESS_DIR }}"
           ENV: "${{ inputs.env }}"
+          EVENT_NAME: "${{ github.event_name }}"
+          BROWSER: "${{ matrix.browser }}"
           REPO: "${{ github.repository }}"
         run: |
           echo branch=$(git -C "${APP_DIR}" rev-parse --abbrev-ref HEAD) >> "${GITHUB_OUTPUT}"
-          echo subject=$([ "$EVENT_NAME" == "schedule" ] && echo -n "Scheduled Tests $(date -u +%Y-%m-%d)_$(($(date -u +%H) / 6 + 1)):" || echo "${ENV}:") $(git -C "${APP_DIR}" log -n1 --format="%s") >> "${GITHUB_OUTPUT}"
+          echo subject=$([ "$EVENT_NAME" == "schedule" ] && echo -n "Scheduled Tests $(date -u +%Y-%m-%d)_$(($(date -u +%H) / 6 + 1))" || echo "${ENV}") "(${BROWSER}):" $(git -C "${APP_DIR}" log -n1 --format="%s") >> "${GITHUB_OUTPUT}"
           git -C "${APP_DIR}" log -n1 --format="author=%an%nemail=%ae%nhash=%H%ntime=%ct" >> "${GITHUB_OUTPUT}"
           echo remote=$(git -C "${APP_DIR}" config --get remote.origin.url) >> "${GITHUB_OUTPUT}"
-          rm -f "cypress.env.json"
+          rm -f "${CYPRESS_DIR}/cypress.env.json"
 
       - name: Download env file
         uses: actions/download-artifact@v3
         with:
           name: cypress_env
-          path: "cypress.env.json"
+          path: "${{ inputs.CYPRESS_DIR }}/cypress.env.json"
 
       - name: Cypress Run
         uses: cypress-io/github-action@v4
         with:
           browser: ${{ matrix.browser }}
           record: true
-          parallel: true
           working-directory: ${{ inputs.CYPRESS_DIR }}
         env:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
