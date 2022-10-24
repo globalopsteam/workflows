@@ -6,6 +6,10 @@ on:
       EC2_INSTANCE_ID:
         required: true
         type: string
+      RUNNER_COUNT:
+        required: false
+        default: 1
+        type: number
 
     secrets:
       AWS_ACCESS_KEY_ID:
@@ -40,3 +44,4 @@ jobs:
           mode: stop
           github-token: ${{ secrets.GH_RUNNER_TOKEN }}
           ec2-instance-id: ${{ inputs.EC2_INSTANCE_ID }}
+          runner-count: ${{ inputs.RUNNER_COUNT }}
