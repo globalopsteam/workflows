@@ -107,7 +107,7 @@ jobs:
     runs-on: ${{ needs.start-runner.outputs.ec2-instance-id }}
     container: cypress/included:10.10.0
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         browser: ['electron', 'chrome', 'firefox']
     steps:
