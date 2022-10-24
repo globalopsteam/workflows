@@ -13,9 +13,11 @@ on:
         type: string
       CYPRESS_DIR:
         default: 'cypress'
+        required: false
         type: string
       APP_DIR:
         default: '.'
+        required: false
         type: string
 
     secrets:
@@ -129,7 +131,7 @@ jobs:
           REPO: "${{ github.repository }}"
         run: |
           echo branch=$(git -C "${APP_DIR}" rev-parse --abbrev-ref HEAD) >> "${GITHUB_OUTPUT}"
-          echo subject=$([ "$EVENT_NAME" == "schedule" ] && echo -n "Scheduled Tests $(date -u +%Y-%m-%d)_$(($(date -u +%H) / 6 + 1))" || echo "${ENV}") "(${BROWSER}):" $(git -C "${APP_DIR}" log -n1 --format="%s") >> "${GITHUB_OUTPUT}"
+          echo subject=$([ "${EVENT_NAME}" = "schedule" ] && echo -n "Scheduled Tests $(date -u +%Y-%m-%d)_$(($(date -u +%H) / 6 + 1))" || echo "${ENV}") "(${BROWSER}):" $(git -C "${APP_DIR}" log -n1 --format="%s") >> "${GITHUB_OUTPUT}"
           git -C "${APP_DIR}" log -n1 --format="author=%an%nemail=%ae%nhash=%H%ntime=%ct" >> "${GITHUB_OUTPUT}"
           echo remote=$(git -C "${APP_DIR}" config --get remote.origin.url) >> "${GITHUB_OUTPUT}"
           rm -f "${CYPRESS_DIR}/cypress.env.json"
