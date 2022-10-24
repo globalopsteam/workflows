@@ -110,23 +110,23 @@ jobs:
         run: |
           aws s3 cp "s3://${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ steps.env_setup.outputs.repo }}/cypress.env.json" "${{ inputs.CYPRESS_DIR }}/cypress.env.json"
 
-    - name: Cypress Run
-      uses: cypress-io/github-action@v4
-      with:
-        browser: ${{ matrix.browser }}
-        record: true
-        parallel: true
-        working-directory: ${{ inputs.CYPRESS_DIR }}
-      env:
-        CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        COMMIT_INFO_BRANCH: ${{ steps.env_setup.outputs.branch != 'HEAD' && steps.env_setup.outputs.branch || inputs.ENV == 'prod' && 'production' || inputs.ENV == 'stage' && 'master' || inputs.env == 'dev' && 'dev' || github.ref_name }}
-        COMMIT_INFO_MESSAGE: ${{ steps.env_setup.outputs.subject }}
-        COMMIT_INFO_AUTHOR: ${{ steps.env_setup.outputs.author }}
-        COMMIT_INFO_EMAIL: ${{ steps.env_setup.outputs.email }}
-        COMMIT_INFO_SHA: ${{ steps.env_setup.outputs.hash }}
-        COMMIT_INFO_TIMESTAMP: ${{ steps.env_setup.outputs.time }}
-        COMMIT_INFO_REMOTE: ${{ steps.env_setup.outputs.remote }}
+      - name: Cypress Run
+        uses: cypress-io/github-action@v4
+        with:
+          browser: ${{ matrix.browser }}
+          record: true
+          parallel: true
+          working-directory: ${{ inputs.CYPRESS_DIR }}
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_INFO_BRANCH: ${{ steps.env_setup.outputs.branch != 'HEAD' && steps.env_setup.outputs.branch || inputs.ENV == 'prod' && 'production' || inputs.ENV == 'stage' && 'master' || inputs.env == 'dev' && 'dev' || github.ref_name }}
+          COMMIT_INFO_MESSAGE: ${{ steps.env_setup.outputs.subject }}
+          COMMIT_INFO_AUTHOR: ${{ steps.env_setup.outputs.author }}
+          COMMIT_INFO_EMAIL: ${{ steps.env_setup.outputs.email }}
+          COMMIT_INFO_SHA: ${{ steps.env_setup.outputs.hash }}
+          COMMIT_INFO_TIMESTAMP: ${{ steps.env_setup.outputs.time }}
+          COMMIT_INFO_REMOTE: ${{ steps.env_setup.outputs.remote }}
 
   stop-runner:
     name: Runner
