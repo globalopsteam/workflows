@@ -73,6 +73,33 @@ jobs:
         run: |
           docker pull "cypress/included:10.10.0"
 
+      - name: Set S3 suffix
+        id: s3_suffix
+        env:
+          REPO: "${{ github.repository }}"
+        run: |
+          echo repo=$(basename "${REPO}" | sed 's/^docker-//') >> "${GITHUB_OUTPUT}"
+
+      - name: Fetch cypress environment json
+        env:
+          ENV: "${{ inputs.ENV }}"
+          REPO: "${{ steps.env_setup.outputs.repo }}"
+          S3_BUCKET: "${{ secrets.S3_BUCKET }}"
+
+        run: |
+          aws s3 cp "s3://${S3_BUCKET}/${ENV}/${REPO}/cypress.env.json" "cypress.env.json"
+
+      - name: Upload env file
+        uses: actions/upload-artifact@v3
+        with:
+          name: cypress_env
+          path: "cypress.env.json"
+          retention-days: 1
+
+      - name: Cleanup
+        run: |
+          rm -f "cypress.env.json"
+
   cypress-run:
     name: Run
     needs:
@@ -100,15 +127,17 @@ jobs:
           ENV: "${{ inputs.env }}"
           REPO: "${{ github.repository }}"
         run: |
-          echo repo=$(basename "${REPO}" | sed 's/^docker-//') >> "${GITHUB_OUTPUT}"
           echo branch=$(git -C "${APP_DIR}" rev-parse --abbrev-ref HEAD) >> "${GITHUB_OUTPUT}"
           echo subject=$([ "$EVENT_NAME" == "schedule" ] && echo -n "Scheduled Tests $(date -u +%Y-%m-%d)_$(($(date -u +%H) / 6 + 1)):" || echo "${ENV}:") $(git -C "${APP_DIR}" log -n1 --format="%s") >> "${GITHUB_OUTPUT}"
           git -C "${APP_DIR}" log -n1 --format="author=%an%nemail=%ae%nhash=%H%ntime=%ct" >> "${GITHUB_OUTPUT}"
           echo remote=$(git -C "${APP_DIR}" config --get remote.origin.url) >> "${GITHUB_OUTPUT}"
+          rm -f "cypress.env.json"
 
-      - name: Fetch cypress environment json
-        run: |
-          aws s3 cp "s3://${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ steps.env_setup.outputs.repo }}/cypress.env.json" "${{ inputs.CYPRESS_DIR }}/cypress.env.json"
+      - name: Download env file
+        uses: actions/download-artifact@v3
+        with:
+          name: cypress_env
+          path: "cypress.env.json"
 
       - name: Cypress Run
         uses: cypress-io/github-action@v4
