@@ -8,7 +8,7 @@ on:
         default: 'dev'
         type: string
       EC2_INSTANCE_TYPE:
-        default: 't3a.xlarge'
+        default: 't3a.large'
         required: false
         type: string
       CYPRESS_DIR:
