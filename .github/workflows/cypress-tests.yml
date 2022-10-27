@@ -45,6 +45,8 @@ on:
         required: true
       S3_BUCKET:
         required: true
+      AWS_KEYPAIR:
+        required: false
 
 jobs:
   start-runner:
@@ -63,6 +65,7 @@ jobs:
       EC2_SUBNET: ${{ secrets.EC2_SUBNET }}
       EC2_SECURITY_GROUP: ${{ secrets.EC2_SECURITY_GROUP }}
       EC2_IAM_ROLE: ${{ secrets.EC2_IAM_ROLE }}
+      AWS_KEYPAIR: ${{ secrets.AWS_KEYPAIR }}
 
   cypress-setup:
     name: Setup
