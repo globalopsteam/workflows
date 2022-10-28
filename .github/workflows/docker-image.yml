@@ -94,6 +94,7 @@ jobs:
 
     - name: Check if image exists in Amazon ECR
       id: check-ecr
+      if: github.event_name == 'push'
       env:
         ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -106,14 +107,14 @@ jobs:
         echo "latest=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_OUTPUT
 
     - name: Validate production image already exists
-      if: inputs.ENV == 'prod' && steps.check-ecr.outputs.exists == 'false'
+      if: github.event_name == 'push' && inputs.ENV == 'prod' && steps.check-ecr.outputs.exists == 'false'
       uses: actions/github-script@v3
       with:
         script: |
           core.setFailed('Production image does not exist already; are master and production branches in sync?')
 
     - name: Build image
-      if: inputs.ENV == 'dev' || steps.check-ecr.outputs.exists == 'false'
+      if: github.event_name == 'pull_request' || steps.check-ecr.outputs.exists == 'false'
       env:
         IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -122,13 +123,14 @@ jobs:
         docker build --build-arg "ECR_REGISTRY=${ECR_REGISTRY}" --build-arg "ENV=${ENV}" -t "${IMAGE_FULL_TAG}" .
 
     - name: Push image to Amazon ECR
-      if: inputs.ENV == 'dev' || steps.check-ecr.outputs.exists == 'false'
+      if: github.event_name == 'push' && steps.check-ecr.outputs.exists == 'false'
       env:
         IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
       run: |
         docker push "${IMAGE_FULL_TAG}"
 
     - name: Tag image in Amazon ECR
+      if: github.event_name == 'push'
       env:
         IMAGE_TAG: ${{ github.sha }}
         ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
@@ -139,7 +141,7 @@ jobs:
 
 
     - name: Prepare for deployment
-      if: inputs.DEPLOY_EC2_INSTANCE != ''
+      if: github.event_name == 'push' && inputs.DEPLOY_EC2_INSTANCE != ''
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
@@ -182,13 +184,13 @@ jobs:
     runs-on: ${{ needs.start-runner.outputs.ec2-instance-id }}
     steps:
     - name: Get EC2 instance IP address
-      if: inputs.DEPLOY_EC2_INSTANCE != ''
+      if: github.event_name == 'push' && inputs.DEPLOY_EC2_INSTANCE != ''
       id: get-ec2-ip
       run: |
         echo "ec2_ip=$(aws ec2 describe-instances --query "Reservations[*].Instances[*].PrivateIpAddress" --filter "Name=tag:Name,Values=${{ inputs.DEPLOY_EC2_INSTANCE }}" --region "${{ secrets.AWS_REGION }}" --output=text)" >> $GITHUB_OUTPUT
 
     - name: Deploy code to EC2 instance
-      if: inputs.DEPLOY_EC2_INSTANCE != '' && steps.get-ec2-ip.outputs.ec2_ip != ''
+      if: github.event_name == 'push' && inputs.DEPLOY_EC2_INSTANCE != '' && steps.get-ec2-ip.outputs.ec2_ip != ''
       env:
         SSH_HOST: ${{ steps.get-ec2-ip.outputs.ec2_ip }}
       run: |
