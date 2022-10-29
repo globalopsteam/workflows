@@ -94,7 +94,6 @@ jobs:
 
     - name: Check if image exists in Amazon ECR
       id: check-ecr
-      if: github.event_name == 'push'
       env:
         ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
