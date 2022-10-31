@@ -52,6 +52,7 @@ jobs:
   start-runner:
     name: Runner
     uses: globalopsteam/workflows/.github/workflows/start-runner.yml@master
+    if: github.event_name != 'pull_request' || github.event.action != 'edited' || github.base_ref == 'dev' && github.event.changes.base.ref.from && github.event.changes.base.ref.from != github.base_ref
     with:
       EC2_INSTANCE_TYPE: ${{ inputs.EC2_INSTANCE_TYPE }}
     secrets:
