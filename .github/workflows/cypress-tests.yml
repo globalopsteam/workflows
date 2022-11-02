@@ -76,7 +76,7 @@ jobs:
     steps:
       - name: Fetch docker image
         run: |
-          docker pull "cypress/included:10.10.0"
+          docker pull "cypress/included:10.11.0"
 
       - name: Set S3 suffix
         id: s3_suffix
@@ -111,7 +111,7 @@ jobs:
       - start-runner
       - cypress-setup
     runs-on: ${{ needs.start-runner.outputs.ec2-instance-id }}
-    container: cypress/included:10.10.0
+    container: cypress/included:10.11.0
     strategy:
       fail-fast: true
       matrix:
