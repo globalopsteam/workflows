@@ -115,7 +115,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        browser: ['chrome', 'firefox']
+        browser: ['chrome']
     steps:
       - name: Checkout
         uses: actions/checkout@v3
