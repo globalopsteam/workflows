@@ -113,9 +113,9 @@ jobs:
     runs-on: ${{ needs.start-runner.outputs.ec2-instance-id }}
     container: cypress/included:10.11.0
     strategy:
-      fail-fast: true
+#      fail-fast: true
       matrix:
-        browser: ['chrome']
+        browser: ['chrome', 'firefox', 'electron']
     steps:
       - name: Checkout
         uses: actions/checkout@v3
