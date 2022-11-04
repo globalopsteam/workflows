@@ -111,11 +111,15 @@ jobs:
       - start-runner
       - cypress-setup
     runs-on: ${{ needs.start-runner.outputs.ec2-instance-id }}
-    container: cypress/included:10.11.0
+    container:
+      image: cypress/included:10.11.0
+      env:
+        CYPRESS_CACHE_FOLDER: "/home/node/.cache/Cypress"
+      options: '--user node --shm-size=2g'
     strategy:
       fail-fast: true
       matrix:
-        browser: ['chrome']
+        browser: ['chrome', 'firefox']
     steps:
       - name: Checkout
         uses: actions/checkout@v3
