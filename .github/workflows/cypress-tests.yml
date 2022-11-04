@@ -113,6 +113,9 @@ jobs:
     runs-on: ${{ needs.start-runner.outputs.ec2-instance-id }}
     container:
       image: cypress/included:10.11.0
+      env:
+        HOME: '/tmp/github'
+        CYPRESS_CACHE_FOLDER: '/tmp/github/.cache/Cypress'
       options: '--user 1001 --shm-size=2g'
     strategy:
       fail-fast: true
@@ -136,6 +139,8 @@ jobs:
           BROWSER: "${{ matrix.browser }}"
           REPO: "${{ github.repository }}"
         run: |
+          mkdir -p '/tmp/github'
+          cp -a '/root/.cache' '/tmp/github/.cache'
           echo branch=$(git -C "${APP_DIR}" rev-parse --abbrev-ref HEAD) >> "${GITHUB_OUTPUT}"
           echo subject=$([ "${EVENT_NAME}" = "schedule" ] && echo -n "Scheduled Tests $(date -u +%Y-%m-%d)_$(($(date -u +%H) / 6 + 1))" || echo "${ENV}") "(${BROWSER}):" $(git -C "${APP_DIR}" log -n1 --format="%s") >> "${GITHUB_OUTPUT}"
           git -C "${APP_DIR}" log -n1 --format="author=%an%nemail=%ae%nhash=%H%ntime=%ct" >> "${GITHUB_OUTPUT}"
