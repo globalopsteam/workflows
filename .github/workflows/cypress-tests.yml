@@ -113,9 +113,7 @@ jobs:
     runs-on: ${{ needs.start-runner.outputs.ec2-instance-id }}
     container:
       image: cypress/included:10.11.0
-      env:
-        CYPRESS_CACHE_FOLDER: "/home/node/.cache/Cypress"
-      options: '--user node --shm-size=2g'
+      options: '--user 1001 --shm-size=2g'
     strategy:
       fail-fast: true
       matrix:
