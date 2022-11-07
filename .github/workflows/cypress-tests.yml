@@ -110,7 +110,7 @@ jobs:
     needs:
       - start-runner
       - cypress-setup
-    if: always() && needs.cypress-setup.result == 'success'
+    if: always() && ! cancelled()
     runs-on: ${{ needs.start-runner.outputs.ec2-instance-id }}
     container:
       image: cypress/included:10.11.0
