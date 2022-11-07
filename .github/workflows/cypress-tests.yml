@@ -107,6 +107,7 @@ jobs:
 
   cypress-run:
     name: Run
+    timeout-minutes: 60
     needs:
       - start-runner
       - cypress-setup
@@ -156,6 +157,7 @@ jobs:
 
       - name: Cypress Run
         uses: cypress-io/github-action@v4
+        timeout-minutes: 30
         with:
           browser: ${{ matrix.browser }}
           record: true
