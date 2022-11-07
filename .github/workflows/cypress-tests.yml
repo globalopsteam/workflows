@@ -110,6 +110,7 @@ jobs:
     needs:
       - start-runner
       - cypress-setup
+    if: always() && jobs.cypress-setup.result == 'success'
     runs-on: ${{ needs.start-runner.outputs.ec2-instance-id }}
     container:
       image: cypress/included:10.11.0
@@ -118,9 +119,9 @@ jobs:
         CYPRESS_CACHE_FOLDER: '/tmp/github/.cache/Cypress'
       options: '--user 1001 --shm-size=2g'
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
-        browser: ['chrome', 'firefox']
+        browser: ['chrome', 'firefox', 'edge', 'electron']
     steps:
       - name: Checkout
         uses: actions/checkout@v3
