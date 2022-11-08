@@ -8,7 +8,7 @@ on:
         default: 'dev'
         type: string
       EC2_INSTANCE_TYPE:
-        default: 'c6a.xlarge'
+        default: 'c6a.2xlarge'
         required: false
         type: string
       CYPRESS_DIR:
@@ -55,7 +55,7 @@ jobs:
     if: always()
     with:
       EC2_INSTANCE_TYPE: ${{ inputs.EC2_INSTANCE_TYPE }}
-      RUNNER_COUNT: 2
+      RUNNER_COUNT: 4
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
