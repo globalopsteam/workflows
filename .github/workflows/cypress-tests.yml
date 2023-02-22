@@ -15,6 +15,10 @@ on:
         default: 'cypress'
         required: false
         type: string
+      CYPRESS_DOCKER_IMAGE:
+        default: 'cypress/included:10.11.0'
+        required: false
+        type: string
       APP_DIR:
         default: '.'
         required: false
@@ -76,8 +80,10 @@ jobs:
     runs-on: ${{ needs.start-runner.outputs.ec2-instance-id }}
     steps:
       - name: Fetch docker image
+        env:
+          CYPRESS_DOCKER_IMAGE: ${{ inputs.CYPRESS_DOCKER_IMAGE }}
         run: |
-          docker pull "cypress/included:10.11.0"
+          docker pull "${CYPRESS_DOCKER_IMAGE}"
 
       - name: Set S3 suffix
         id: s3_suffix
@@ -115,7 +121,7 @@ jobs:
     if: always() && cancelled() == false
     runs-on: ${{ needs.start-runner.outputs.ec2-instance-id }}
     container:
-      image: cypress/included:10.11.0
+      image: ${{ inputs.CYPRESS_DOCKER_IMAGE }}
       env:
         HOME: '/tmp/github'
         CYPRESS_CACHE_FOLDER: '/tmp/github/.cache/Cypress'
