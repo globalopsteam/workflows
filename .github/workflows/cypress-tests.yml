@@ -173,6 +173,7 @@ jobs:
         with:
           browser: ${{ matrix.browser }}
           record: true
+          parallel: true
           working-directory: ${{ inputs.CYPRESS_DIR }}
         env:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
