@@ -192,7 +192,7 @@ jobs:
       - build-push
     runs-on: ${{ needs.start-runner.outputs.ec2-instance-id }}
     steps:
-    - name: Get EC2 instance IP address
+    - name: Get EC2 instance IP address(es)
       if: github.event_name == 'push' && inputs.DEPLOY_EC2_INSTANCE != ''
       id: get-ec2-ip
       run: |
@@ -201,13 +201,25 @@ jobs:
     - name: Deploy code to EC2 instance
       if: github.event_name == 'push' && inputs.DEPLOY_EC2_INSTANCE != '' && steps.get-ec2-ip.outputs.ec2_ip != ''
       env:
-        SSH_HOST: ${{ steps.get-ec2-ip.outputs.ec2_ip }}
+        SSH_HOSTS: ${{ steps.get-ec2-ip.outputs.ec2_ip }}
       run: |
-        echo "Testing SSH connection" >&2
-        RUN=0; while [[ "${RUN}" -lt "10" ]]; do ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "ubuntu@${SSH_HOST}" "test" && break || { echo "Waiting 30 seconds to try SSH connection again" >&2; sleep 30; }; RUN=$((RUN + 1)); done; [[ "${RUN}" -ge "10" ]] && exit 255
+        HOSTS=""
+        for SSH_HOST in ${SSH_HOSTS}; do
+          echo "Testing SSH connection to: $SSH_HOST" >&2
+          RUN=0
+          while [[ "${RUN}" -lt "10" ]]; do
+            ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "ubuntu@$SSH_HOST" "test" && break || { echo "Waiting 30 seconds to try SSH connection again" >&2; sleep 30; };
+            RUN=$((RUN + 1))
+          done
+          [[ "${RUN}" -ge "10" ]] || HOSTS="$HOSTS $SSH_HOST"
+        done
 
-        echo "Deploying Code" >&2
-        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "ubuntu@${SSH_HOST}" "${{ inputs.ECR_REPOSITORY }}@${{ inputs.ENV }}" < ".archive.tgz"
+        [[ -n "$HOSTS" ]] || exit 2
+
+        for SSH_HOST in $HOSTS; do
+          echo "Deploying Code to: $SSH_HOST" >&2
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "ubuntu@$SSH_HOST" "${{ inputs.ECR_REPOSITORY }}@${{ inputs.ENV }}" < ".archive.tgz"
+        done
 
   stop-runner:
     name: Runner
