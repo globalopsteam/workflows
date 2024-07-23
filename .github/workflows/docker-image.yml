@@ -87,6 +87,14 @@ jobs:
         submodules: 'recursive'
         token: ${{ secrets.GH_RUNNER_TOKEN }}
 
+    - name: Generate build ID
+      id: prep
+      run: |
+          branch=${GITHUB_REF##*/}
+          sha=${GITHUB_SHA::8}
+          ts=$(date +%s)
+          echo "::set-output name=BUILD_ID::${branch}-${sha}-${ts}"
+
     - name: Update remote submodules
       if: inputs.ENV == 'dev' && inputs.UPDATE_SUBMODULE
       run: |
@@ -146,6 +154,7 @@ jobs:
         MANIFEST=$(aws ecr batch-get-image --repository-name "${ECR_REPOSITORY}" --image-ids "imageTag=${IMAGE_TAG}" --query images[].imageManifest --output text)
         aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "${{ inputs.ENV }}" --image-manifest "${MANIFEST}" > /dev/null || true
         aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "latest" --image-manifest "${MANIFEST}" > /dev/null || true
+        aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "${{ steps.prep.outputs.BUILD_ID }}" --image-manifest "${MANIFEST}" > /dev/null || true
 
 
     - name: Prepare for deployment
