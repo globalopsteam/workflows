@@ -38,6 +38,8 @@ on:
         required: true
       S3_BUCKET:
         required: true
+      AWS_REGION:
+        required: true
 
 jobs:
   build-push:
