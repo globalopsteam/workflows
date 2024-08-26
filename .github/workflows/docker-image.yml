@@ -40,6 +40,8 @@ on:
         required: true
       AWS_REGION:
         required: true
+      PIP_EXTRA_INDEX_URL:
+	required: false
 
 jobs:
   build-push:
@@ -106,6 +108,7 @@ jobs:
         IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ENV: ${{ inputs.ENV }}
+        PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
       run: |
         docker build --build-arg "ECR_REGISTRY=${ECR_REGISTRY}" --build-arg "ENV=${ENV}" -t "${IMAGE_FULL_TAG}" .
 
