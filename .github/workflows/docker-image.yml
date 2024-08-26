@@ -108,8 +108,9 @@ jobs:
         IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ENV: ${{ inputs.ENV }}
+        PIP_EXTRA_INDEX_URL: ${{ secrets.PIP_EXTRA_INDEX_URL }}
       run: |
-        docker build --build-arg "ECR_REGISTRY=${ECR_REGISTRY}" --build-arg "ENV=${ENV}" --build-arg "PIP_EXTRA_INDEX_URL=${secrets.PIP_EXTRA_INDEX_URL}" -t "${IMAGE_FULL_TAG}" .
+        docker build --build-arg "ECR_REGISTRY=${ECR_REGISTRY}" --build-arg "ENV=${ENV}" --build-arg "PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL}" -t "${IMAGE_FULL_TAG}" .
 
     - name: Push image to Amazon ECR
       if: github.event_name == 'push' && steps.check-ecr.outputs.exists == 'false'
