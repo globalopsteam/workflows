@@ -41,7 +41,7 @@ on:
       AWS_REGION:
         required: true
       PIP_EXTRA_INDEX_URL:
-	required: false
+        required: false
 
 jobs:
   build-push:
