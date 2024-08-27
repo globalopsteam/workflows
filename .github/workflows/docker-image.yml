@@ -28,8 +28,9 @@ on:
         type: string
       UPDATE_SUBMODULE:
         required: false
+# lol, type isn't supported for inputs, this is a string, whatever
         default: true
-        type: boolean
+        type: boolean 
 
     secrets:
       AWS_ACCESS_KEY_ID:
@@ -73,7 +74,7 @@ jobs:
           echo "::set-output name=BUILD_ID::${branch}-${sha}-${ts}"
 
     - name: Update remote submodules
-      if: inputs.ENV == 'dev' && inputs.UPDATE_SUBMODULE
+      if: inputs.ENV == 'dev' && inputs.UPDATE_SUBMODULE == 'false'
       run: |
         git submodule update --remote
 
