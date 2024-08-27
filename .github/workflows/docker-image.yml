@@ -74,7 +74,7 @@ jobs:
           echo "::set-output name=BUILD_ID::${branch}-${sha}-${ts}"
 
     - name: Update remote submodules
-      if: inputs.ENV == 'dev' && inputs.UPDATE_SUBMODULE == 'false'
+      if: inputs.ENV == 'dev' && inputs.UPDATE_SUBMODULE == 'true'
       run: |
         git submodule update --remote
 
