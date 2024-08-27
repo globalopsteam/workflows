@@ -43,6 +43,8 @@ on:
         required: true
       PIP_EXTRA_INDEX_URL:
         required: false
+      GH_RUNNER_TOKEN:
+        required: false
 
 jobs:
   build-push:
@@ -60,8 +62,20 @@ jobs:
         sudo apt-get install -y git jq docker.io yarn unzip
         sudo systemctl enable docker
 
-    - name: Checkout
+    - name: Checkout recursive submodules with GH_RUNNER_TOKEN
       uses: actions/checkout@v3
+      env:
+        GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+      if: env.GH_RUNNER_TOKEN != null
+      with:
+        token: ${{ secrets.GH_RUNNER_TOKEN }}
+        submodules: 'recursive'
+
+    - name: Checkout without GH_RUNNER_TOKEN
+      uses: actions/checkout@v3
+      env:
+        GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+      if: env.GH_RUNNER_TOKEN == null
       with:
         submodules: 'recursive'
 
