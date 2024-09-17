@@ -1,43 +1,25 @@
-name: Build docker image, push to AWS ECR, and deploy code
+name: Build docker image and push to AWS ECR
 
 on:
   workflow_call:
     inputs:
       ENV:
         required: false
-        default: 'dev'
+        default: "dev"
         type: string
       ECR_REPOSITORY:
         required: true
         type: string
-      DEPLOY_EC2_INSTANCE:
-        default: ''
-        required: false
-        type: string
-      DEPLOY_TAR_FILES_EXTRA:
-        default: ''
-        required: false
-        type: string
-      DEPLOY_ENVIRONMENT:
-        default: ''
-        required: false
-        type: string
-      EC2_INSTANCE_TYPE:
-        default: 't3a.micro'
-        required: false
-        type: string
       UPDATE_SUBMODULE:
         required: false
-# lol, type isn't supported for inputs, this is a string, whatever
+        # lol, type isn't supported for inputs, this is a string, whatever
         default: true
-        type: boolean 
+        type: boolean
 
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
       AWS_SECRET_ACCESS_KEY:
-        required: true
-      S3_BUCKET:
         required: true
       AWS_REGION:
         required: true
@@ -49,162 +31,81 @@ on:
 jobs:
   build-push:
     name: Build + Push
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
-    - name: Prepare worker?
-      run: |
-        #!/bin/sh
-        set -xe
-        curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo tee /etc/apt/trusted.gpg.d/yarn.asc > /dev/null
-        echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list > /dev/null
-        export DEBIAN_FRONTEND="noninteractive"
-        sudo apt-get update -y
-        sudo apt-get install -y git jq docker.io yarn unzip
-        sudo systemctl enable docker
+      - name: Checkout recursive submodules with GH_RUNNER_TOKEN
+        uses: actions/checkout@v3
+        env:
+          GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+        if: env.GH_RUNNER_TOKEN != null
+        with:
+          token: ${{ secrets.GH_RUNNER_TOKEN }}
+          submodules: "recursive"
 
-    - name: Checkout recursive submodules with GH_RUNNER_TOKEN
-      uses: actions/checkout@v3
-      env:
-        GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
-      if: env.GH_RUNNER_TOKEN != null
-      with:
-        token: ${{ secrets.GH_RUNNER_TOKEN }}
-        submodules: 'recursive'
+      - name: Checkout without GH_RUNNER_TOKEN
+        uses: actions/checkout@v3
+        env:
+          GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+        if: env.GH_RUNNER_TOKEN == null
+        with:
+          submodules: "recursive"
 
-    - name: Checkout without GH_RUNNER_TOKEN
-      uses: actions/checkout@v3
-      env:
-        GH_RUNNER_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
-      if: env.GH_RUNNER_TOKEN == null
-      with:
-        submodules: 'recursive'
-
-    - name: Generate build ID
-      id: prep
-      run: |
+      - name: Generate build ID
+        id: prep
+        run: |
           branch=${GITHUB_REF##*/}
           sha=${GITHUB_SHA::8}
           ts=$(date +%s)
           echo "::set-output name=BUILD_ID::${branch}-${sha}-${ts}"
 
-    - name: Update remote submodules
-      if: inputs.ENV == 'dev' && inputs.UPDATE_SUBMODULE == 'true'
-      run: |
-        git submodule update --remote
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1-node16
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1-node16
-      with:
-        aws-region: ${{ secrets.AWS_REGION }}
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
+      - name: Check if image exists in Amazon ECR
+        id: check-ecr
+        env:
+          ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          aws ecr create-repository --repository-name "${ECR_REPOSITORY}" || true
+          MANIFEST=$(aws ecr batch-get-image --repository-name "${ECR_REPOSITORY}" --image-ids "imageTag=${IMAGE_TAG}" --query images[].imageManifest --output text)
+          { [[ -n "${MANIFEST}" ]] && echo "exists=true" || echo "exists=false"; } >> $GITHUB_OUTPUT
+          echo "tag=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "branch=$ECR_REGISTRY/$ECR_REPOSITORY:${{ inputs.ENV }}" >> $GITHUB_OUTPUT
+          echo "latest=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_OUTPUT
 
-    - name: Check if image exists in Amazon ECR
-      id: check-ecr
-      env:
-        ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}
-      run: |
-        aws ecr create-repository --repository-name "${ECR_REPOSITORY}" || true
-        MANIFEST=$(aws ecr batch-get-image --repository-name "${ECR_REPOSITORY}" --image-ids "imageTag=${IMAGE_TAG}" --query images[].imageManifest --output text)
-        { [[ -n "${MANIFEST}" ]] && echo "exists=true" || echo "exists=false"; } >> $GITHUB_OUTPUT
-        echo "tag=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
-        echo "branch=$ECR_REGISTRY/$ECR_REPOSITORY:${{ inputs.ENV }}" >> $GITHUB_OUTPUT
-        echo "latest=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_OUTPUT
+      - name: Build image
+        if: github.event_name == 'pull_request' || steps.check-ecr.outputs.exists == 'false'
+        env:
+          IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ENV: ${{ inputs.ENV }}
+        run: |
+          docker build --build-arg "ECR_REGISTRY=${ECR_REGISTRY}" --build-arg "ENV=${ENV}" --build-arg "PIP_EXTRA_INDEX_URL=${{ secrets.PIP_EXTRA_INDEX_URL }}" -t "${IMAGE_FULL_TAG}" .
 
-    - name: Build image
-      if: github.event_name == 'pull_request' || steps.check-ecr.outputs.exists == 'false'
-      env:
-        IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ENV: ${{ inputs.ENV }}
-      run: |
-        docker build --build-arg "ECR_REGISTRY=${ECR_REGISTRY}" --build-arg "ENV=${ENV}" --build-arg "PIP_EXTRA_INDEX_URL=${{ secrets.PIP_EXTRA_INDEX_URL }}" -t "${IMAGE_FULL_TAG}" .
+      - name: Push image to Amazon ECR
+        if: github.event_name == 'push' && steps.check-ecr.outputs.exists == 'false'
+        env:
+          IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
+        run: |
+          docker push "${IMAGE_FULL_TAG}"
 
-    - name: Push image to Amazon ECR
-      if: github.event_name == 'push' && steps.check-ecr.outputs.exists == 'false'
-      env:
-        IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
-      run: |
-        docker push "${IMAGE_FULL_TAG}"
-
-    - name: Tag image in Amazon ECR
-      if: github.event_name == 'push'
-      env:
-        IMAGE_TAG: ${{ github.sha }}
-        ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
-      run: |
-        MANIFEST=$(aws ecr batch-get-image --repository-name "${ECR_REPOSITORY}" --image-ids "imageTag=${IMAGE_TAG}" --query images[].imageManifest --output text)
-        aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "${{ inputs.ENV }}" --image-manifest "${MANIFEST}" > /dev/null || true
-        aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "latest" --image-manifest "${MANIFEST}" > /dev/null || true
-        aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "${{ steps.prep.outputs.BUILD_ID }}" --image-manifest "${MANIFEST}" > /dev/null || true
-
-
-    - name: Prepare for deployment
-      if: github.event_name == 'push' && inputs.DEPLOY_EC2_INSTANCE != ''
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
-        IMAGE_FULL_BRANCH: ${{ steps.check-ecr.outputs.branch }}
-        IMAGE_FULL_LATEST: ${{ steps.check-ecr.outputs.latest }}
-        ENV: ${{ inputs.ENV }}
-        DEPLOYMENT_JSON: "${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.json"
-        DEPLOYMENT_TAR: "${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.tgz"
-        DEPLOYMENT_S3_JSON: "s3://${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.json"
-        DEPLOYMENT_S3_TAR: "s3://${{ secrets.S3_BUCKET }}/${{ inputs.ENV }}/${{ inputs.ECR_REPOSITORY }}.tgz"
-      run: |
-        echo "Creating environment file for docker-compose" >&2
-        echo "AWS_REGION=${{ secrets.AWS_REGION }}" > ".env.build"
-        echo "DOCKERHOME=/home/ubuntu" >> ".env.build"
-        echo "ENV=${ENV}" >> ".env.build"
-        echo "ECR_REGISTRY=${ECR_REGISTRY}" >> ".env.build"
-        echo "IMAGE_FULL_TAG=${IMAGE_FULL_TAG}" >> ".env.build"
-        echo "IMAGE_FULL_BRANCH=${IMAGE_FULL_BRANCH}" >> ".env.build"
-        echo "IMAGE_FULL_LATEST=${IMAGE_FULL_LATEST}" >> ".env.build"
-
-        echo "Creating archive for deployment" >&2
-        ln -sfv ".env.build" ".env"
-        tar -c ".env" ".env.build" "docker-compose.yml" ${{ inputs.DEPLOY_TAR_FILES_EXTRA }} | gzip -9 > ".archive.tgz"
-
-        echo "Preparing deployment JSON"
-        echo -n '{"archive":"' > ".deployment.json"
-        base64 -w 0 >> ".deployment.json" < ".archive.tgz"
-        echo '"}' >> ".deployment.json"
-
-        echo "Updating deployment metadata: ${DEPLOYMENT_S3_JSON} ${DEPLOYMENT_S3_TAR}" >&2
-        if [ "$(aws s3api head-object --bucket '${{ secrets.S3_BUCKET }}' --key "${DEPLOYMENT_JSON}" | awk '/"githash":/ { print $2 }' | cut -f2 -d'"' || true)" != "${{ github.sha }}" ]; then aws s3 cp --metadata "githash=${{ github.sha }}" ".deployment.json" "${DEPLOYMENT_S3_JSON}"; fi
-        if [ "$(aws s3api head-object --bucket '${{ secrets.S3_BUCKET }}' --key "${DEPLOYMENT_TAR}" | awk '/"githash":/ { print $2 }' | cut -f2 -d'"' || true)" != "${{ github.sha }}" ]; then aws s3 cp --metadata "githash=${{ github.sha }}" ".archive.tgz" "${DEPLOYMENT_S3_TAR}"; fi
-
-    - name: Get EC2 instance IP address(es)
-      if: github.event_name == 'push' && inputs.DEPLOY_EC2_INSTANCE != ''
-      id: get-ec2-ip
-      run: |
-        echo "ec2_ip=$(echo $(aws ec2 describe-instances --query "Reservations[*].Instances[*].PrivateIpAddress" --filter "Name=tag:Name,Values=${{ inputs.DEPLOY_EC2_INSTANCE }}" --region "${{ secrets.AWS_REGION }}" --output=text))" >> $GITHUB_OUTPUT
-
-    - name: Deploy code to EC2 instance
-      if: github.event_name == 'push' && inputs.DEPLOY_EC2_INSTANCE != '' && steps.get-ec2-ip.outputs.ec2_ip != ''
-      env:
-        SSH_HOSTS: ${{ steps.get-ec2-ip.outputs.ec2_ip }}
-      run: |
-        HOSTS=""
-        for SSH_HOST in ${SSH_HOSTS}; do
-          echo "Testing SSH connection to: $SSH_HOST" >&2
-          RUN=0
-          while [[ "${RUN}" -lt "10" ]]; do
-            ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "ubuntu@$SSH_HOST" "test" && break || { echo "Waiting 30 seconds to try SSH connection again" >&2; sleep 30; };
-            RUN=$((RUN + 1))
-          done
-          [[ "${RUN}" -ge "10" ]] || HOSTS="$HOSTS $SSH_HOST"
-        done
-
-        [[ -n "$HOSTS" ]] || exit 2
-
-        for SSH_HOST in $HOSTS; do
-          echo "Deploying Code to: $SSH_HOST" >&2
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "ubuntu@$SSH_HOST" "${{ inputs.ECR_REPOSITORY }}@${{ inputs.ENV }}" < ".archive.tgz"
-        done
+      - name: Tag image in Amazon ECR
+        if: github.event_name == 'push'
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
+        run: |
+          MANIFEST=$(aws ecr batch-get-image --repository-name "${ECR_REPOSITORY}" --image-ids "imageTag=${IMAGE_TAG}" --query images[].imageManifest --output text)
+          aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "${{ inputs.ENV }}" --image-manifest "${MANIFEST}" > /dev/null || true
+          aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "latest" --image-manifest "${MANIFEST}" > /dev/null || true
+          aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "${{ steps.prep.outputs.BUILD_ID }}" --image-manifest "${MANIFEST}" > /dev/null || true
