@@ -69,8 +69,8 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Check if image exists in Amazon ECR
-        id: check-ecr
+      - name: Setup Amazon ECR
+        id: setup-ecr
         env:
           ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -84,18 +84,18 @@ jobs:
           echo "latest=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_OUTPUT
 
       - name: Build image
-        if: github.event_name == 'pull_request' || steps.check-ecr.outputs.exists == 'false'
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         env:
-          IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
+          IMAGE_FULL_TAG: ${{ steps.setup-ecr.outputs.tag }}
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ENV: ${{ inputs.ENV }}
         run: |
           docker build --build-arg "ECR_REGISTRY=${ECR_REGISTRY}" --build-arg "ENV=${ENV}" --build-arg "PIP_EXTRA_INDEX_URL=${{ secrets.PIP_EXTRA_INDEX_URL }}" -t "${IMAGE_FULL_TAG}" .
 
       - name: Push image to Amazon ECR
-        if: github.event_name == 'push' && steps.check-ecr.outputs.exists == 'false'
+        if: github.event_name == 'push'
         env:
-          IMAGE_FULL_TAG: ${{ steps.check-ecr.outputs.tag }}
+          IMAGE_FULL_TAG: ${{ steps.setup-ecr.outputs.tag }}
         run: |
           docker push "${IMAGE_FULL_TAG}"
 
