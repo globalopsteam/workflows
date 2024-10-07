@@ -1,4 +1,4 @@
-name: Build docker image and push to AWS ECR
+name: Build docker image and push to registry
 
 on:
   workflow_call:
