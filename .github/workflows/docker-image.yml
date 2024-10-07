@@ -7,21 +7,16 @@ on:
         required: false
         default: "dev"
         type: string
-      ECR_REPOSITORY:
+      IMAGE_REPOSITORY:
         required: true
         type: string
-      UPDATE_SUBMODULE:
-        required: false
-        # lol, type isn't supported for inputs, this is a string, whatever
-        default: true
-        type: boolean
 
     secrets:
-      AWS_ACCESS_KEY_ID:
+      REGISTRY_ADDRESS:
         required: true
-      AWS_SECRET_ACCESS_KEY:
+      REGISTRY_USERNAME:
         required: true
-      AWS_REGION:
+      REGISTRY_PASSWORD:
         required: true
       PIP_EXTRA_INDEX_URL:
         required: false
@@ -50,62 +45,64 @@ jobs:
         with:
           submodules: "recursive"
 
+      - name: Get the branch or tag name and set the environment
+        id: branch-tag
+        run: |
+          echo "Git ref: $GITHUB_REF"
+          if [[ "$GITHUB_REF" == refs/heads/* ]]; then
+            BRANCH_NAME=${GITHUB_REF#refs/heads/}
+            echo "This is a branch: $BRANCH_NAME"
+            echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+            echo "env=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+            echo "This is a tag: $TAG_NAME"
+            echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+            echo "env=tag-${TAG_NAME}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Generate build ID
         id: prep
         run: |
           branch=${GITHUB_REF##*/}
           sha=${GITHUB_SHA::8}
           ts=$(date +%s)
-          echo "::set-output name=BUILD_ID::${branch}-${sha}-${ts}"
+          echo "::set-output name=BUILD_ID::${{ steps.branch-tag.outputs.env }}-${sha}-${ts}"
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1-node16
+      - name: Login to Docker registry
+        uses: docker/login-action@v3
         with:
-          aws-region: ${{ secrets.AWS_REGION }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          registry: ${{ secrets.REGISTRY_ADDRESS }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Setup Amazon ECR
-        id: setup-ecr
+      - name: Determine initial image tags
+        id: determine-image-tags
         env:
-          ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_REPOSITORY: ${{ inputs.IMAGE_REPOSITORY }}
+          REGISTRY_ADDRESS: ${{ secrets.REGISTRY_ADDRESS }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          aws ecr create-repository --repository-name "${ECR_REPOSITORY}" || true
-          MANIFEST=$(aws ecr batch-get-image --repository-name "${ECR_REPOSITORY}" --image-ids "imageTag=${IMAGE_TAG}" --query images[].imageManifest --output text)
-          { [[ -n "${MANIFEST}" ]] && echo "exists=true" || echo "exists=false"; } >> $GITHUB_OUTPUT
-          echo "tag=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
-          echo "branch=$ECR_REGISTRY/$ECR_REPOSITORY:${{ inputs.ENV }}" >> $GITHUB_OUTPUT
-          echo "latest=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_OUTPUT
+          echo "tag=$REGISTRY_ADDRESS/$IMAGE_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "branch=$REGISTRY_ADDRESS/$IMAGE_REPOSITORY:${{ steps.branch-tag.outputs.env }}" >> $GITHUB_OUTPUT
+          echo "latest=$REGISTRY_ADDRESS/$IMAGE_REPOSITORY:latest" >> $GITHUB_OUTPUT
+          echo "build_id=$REGISTRY_ADDRESS/$IMAGE_REPOSITORY:${{ steps.prep.outputs.BUILD_ID }}" >> $GITHUB_OUTPUT
 
       - name: Build image
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         env:
-          IMAGE_FULL_TAG: ${{ steps.setup-ecr.outputs.tag }}
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ENV: ${{ inputs.ENV }}
+          IMAGE_FULL_TAG_SHA: ${{ steps.determine-image-tags.outputs.tag }}
+          IMAGE_FULL_TAG_BRANCH: ${{ steps.determine-image-tags.outputs.branch }}
+          IMAGE_FULL_TAG_LATEST: ${{ steps.determine-image-tags.outputs.latest }}
+          IMAGE_FULL_TAG_BUILD_ID: ${{ steps.determine-image-tags.outputs.build_id }}
+          REGISTRY_ADDRESS: ${{ secrets.REGISTRY_ADDRESS }}
+          ENV: ${{ steps.branch-tag.outputs.env }}
         run: |
-          docker build --build-arg "ECR_REGISTRY=${ECR_REGISTRY}" --build-arg "ENV=${ENV}" --build-arg "PIP_EXTRA_INDEX_URL=${{ secrets.PIP_EXTRA_INDEX_URL }}" -t "${IMAGE_FULL_TAG}" .
+          docker build --build-arg "REGISTRY_ADDRESS=${REGISTRY_ADDRESS}" --build-arg "ENV=${ENV}" --build-arg "PIP_EXTRA_INDEX_URL=${{ secrets.PIP_EXTRA_INDEX_URL }}" -t "${IMAGE_FULL_TAG_SHA}" -t "${IMAGE_FULL_TAG_BRANCH}" -t "${IMAGE_FULL_TAG_BUILD_ID}" -t "${IMAGE_FULL_TAG_LATEST}" .
 
-      - name: Push image to Amazon ECR
+      - name: Push image to Docker Registry
         if: github.event_name == 'push'
         env:
-          IMAGE_FULL_TAG: ${{ steps.setup-ecr.outputs.tag }}
+          IMAGE_FULL_TAG: ${{ steps.determine-image-tags.outputs.tag }}
         run: |
-          docker push "${IMAGE_FULL_TAG}"
-
-      - name: Tag image in Amazon ECR
-        if: github.event_name == 'push'
-        env:
-          IMAGE_TAG: ${{ github.sha }}
-          ECR_REPOSITORY: ${{ inputs.ECR_REPOSITORY }}
-        run: |
-          MANIFEST=$(aws ecr batch-get-image --repository-name "${ECR_REPOSITORY}" --image-ids "imageTag=${IMAGE_TAG}" --query images[].imageManifest --output text)
-          aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "${{ inputs.ENV }}" --image-manifest "${MANIFEST}" > /dev/null || true
-          aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "latest" --image-manifest "${MANIFEST}" > /dev/null || true
-          aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "${{ steps.prep.outputs.BUILD_ID }}" --image-manifest "${MANIFEST}" > /dev/null || true
+          docker push "${IMAGE_FULL_TAG} --all-tags"
