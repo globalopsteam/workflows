@@ -3,10 +3,6 @@ name: Build docker image and push to registry
 on:
   workflow_call:
     inputs:
-      ENV:
-        required: false
-        default: "dev"
-        type: string
       IMAGE_REPOSITORY:
         required: true
         type: string
