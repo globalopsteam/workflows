@@ -101,4 +101,4 @@ jobs:
         env:
           IMAGE_FULL_TAG: ${{ steps.determine-image-tags.outputs.tag }}
         run: |
-          docker push "${IMAGE_FULL_TAG}" --all-tags
+          docker push "${{ secrets.REGISTRY_ADDRESS }}/${{ inputs.IMAGE_REPOSITORY }}" --all-tags
