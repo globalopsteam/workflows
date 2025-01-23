@@ -6,6 +6,9 @@ on:
       IMAGE_REPOSITORY:
         required: true
         type: string
+      ADDITIONAL_VARIANT:
+        required: false
+        type: string
 
     secrets:
       REGISTRY_ADDRESS:
@@ -95,6 +98,18 @@ jobs:
           ENV: ${{ steps.branch-tag.outputs.env }}
         run: |
           docker build --build-arg "REGISTRY_ADDRESS=${REGISTRY_ADDRESS}" --build-arg "ENV=${ENV}" --build-arg "PIP_EXTRA_INDEX_URL=${{ secrets.PIP_EXTRA_INDEX_URL }}" -t "${IMAGE_FULL_TAG_SHA}" -t "${IMAGE_FULL_TAG_BRANCH}" -t "${IMAGE_FULL_TAG_BUILD_ID}" -t "${IMAGE_FULL_TAG_LATEST}" .
+
+      - name: Build additional variant image
+        if: inputs.ADDITIONAL_VARIANT != null && inputs.ADDITIONAL_VARIANT != '' && (github.event_name == 'pull_request' || github.event_name == 'push')
+        env:
+          IMAGE_FULL_TAG_SHA: ${{ steps.determine-image-tags.outputs.tag }}
+          IMAGE_FULL_TAG_BRANCH: ${{ steps.determine-image-tags.outputs.branch }}
+          IMAGE_FULL_TAG_LATEST: ${{ steps.determine-image-tags.outputs.latest }}
+          IMAGE_FULL_TAG_BUILD_ID: ${{ steps.determine-image-tags.outputs.build_id }}
+          REGISTRY_ADDRESS: ${{ secrets.REGISTRY_ADDRESS }}
+          ENV: ${{ steps.branch-tag.outputs.env }}
+        run: |
+          docker build --build-arg "REGISTRY_ADDRESS=${REGISTRY_ADDRESS}" --build-arg "ENV=${ENV}" --build-arg "PIP_EXTRA_INDEX_URL=${{ secrets.PIP_EXTRA_INDEX_URL }}" -t "${IMAGE_FULL_TAG_SHA}-${{ inputs.ADDITIONAL_VARIANT }}" -t "${IMAGE_FULL_TAG_BRANCH}-${{ inputs.ADDITIONAL_VARIANT }}" -t "${IMAGE_FULL_TAG_BUILD_ID}-${{ inputs.ADDITIONAL_VARIANT }}" -t "${IMAGE_FULL_TAG_LATEST}-${{ inputs.ADDITIONAL_VARIANT }}" -f "Dockerfile.${{ inputs.ADDITIONAL_VARIANT }}" .
 
       - name: Push image to Docker Registry
         if: github.event_name == 'push'
