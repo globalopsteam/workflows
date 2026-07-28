@@ -50,11 +50,20 @@ jobs:
             echo "This is a branch: $BRANCH_NAME"
             echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
             echo "env=$BRANCH_NAME" >> $GITHUB_OUTPUT
+            # base_env: the env whose base images the Dockerfile FROMs (e.g. globalops-base:<env>).
+            # Env branches use their own base image; a feature branch has no matching base image, so
+            # fall back to dev (whose base images always exist). The built image is still tagged by
+            # branch (env/build_id above), so feature builds never collide with or deploy as dev.
+            case "$BRANCH_NAME" in
+              dev|stage|prod|master) echo "base_env=$BRANCH_NAME" >> $GITHUB_OUTPUT ;;
+              *) echo "base_env=dev" >> $GITHUB_OUTPUT ;;
+            esac
           elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
             TAG_NAME=${GITHUB_REF#refs/tags/}
             echo "This is a tag: $TAG_NAME"
             echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
             echo "env=tag-${TAG_NAME}" >> $GITHUB_OUTPUT
+            echo "base_env=tag-${TAG_NAME}" >> $GITHUB_OUTPUT
           fi
 
       - name: Generate build ID
@@ -92,7 +101,7 @@ jobs:
           IMAGE_FULL_TAG_LATEST: ${{ steps.determine-image-tags.outputs.latest }}
           IMAGE_FULL_TAG_BUILD_ID: ${{ steps.determine-image-tags.outputs.build_id }}
           REGISTRY_ADDRESS: ${{ secrets.REGISTRY_ADDRESS }}
-          ENV: ${{ steps.branch-tag.outputs.env }}
+          ENV: ${{ steps.branch-tag.outputs.base_env }}
         run: |
           docker build --build-arg "REGISTRY_ADDRESS=${REGISTRY_ADDRESS}" --build-arg "ENV=${ENV}" --build-arg "PIP_EXTRA_INDEX_URL=${{ secrets.PIP_EXTRA_INDEX_URL }}" -t "${IMAGE_FULL_TAG_SHA}" -t "${IMAGE_FULL_TAG_BRANCH}" -t "${IMAGE_FULL_TAG_BUILD_ID}" -t "${IMAGE_FULL_TAG_LATEST}" .
 
